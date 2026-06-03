@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>环球知识大富翁 3D - 星环版</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --p1: #ff4757; --p2: #2ed573; --p3: #1e90ff; --p4: #ffa502;
+  --gold: #ffd700; --dark: #0f0f23; --panel: rgba(20,20,40,0.95);
+}
+body {
+  font-family: 'Microsoft YaHei', sans-serif;
+  background: linear-gradient(135deg, #0c0c1d 0%, #1a1a3e 50%, #16213e 100%);
+  color: #fff; height: 100vh; overflow: hidden;
+}
+
+/* ===== SCREENS ===== */
+.screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity .6s; }
+.screen.hidden { opacity: 0; pointer-events: none; }
+#startScreen { background: radial-gradient(ellipse at center, #1e1e4f 0%, #0a0a1a 100%); z-index: 100; }
+#gameScreen { z-index: 10; opacity: 0; }
+#gameScreen:not(.hidden) { opacity: 1; }
+#gameOverScreen { background: rgba(0,0,0,.92); z-index: 200; }
+
+/* ===== START UI ===== */
+.game-title { font-size: 52px; font-weight: 900; margin-bottom: 8px; background: linear-gradient(90deg,#ffd700,#ff6b6b,#c44569); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 40px rgba(255,215,0,.3); letter-spacing: 2px; }
+.game-subtitle { font-size: 18px; opacity: .7; margin-bottom: 30px; }
+.map-selection { display: flex; gap: 25px; margin-bottom: 25px; }
+.map-card { width: 260px; padding: 25px; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.15); border-radius: 20px; cursor: pointer; text-align: center; transition: all .3s; backdrop-filter: blur(10px); }
+.map-card:hover, .map-card.selected { border-color: var(--gold); background: rgba(255,215,0,.12); transform: translateY(-5px); box-shadow: 0 15px 40px rgba(255,215,0,.2); }
+.map-card .map-icon { font-size: 50px; margin-bottom: 10px; }
+.map-card h3 { font-size: 22px; margin-bottom: 6px; }
+.map-card p { font-size: 13px; opacity: .8; line-height: 1.5; }
+.player-count { display: flex; gap: 12px; margin-bottom: 20px; }
+.count-btn { width: 45px; height: 45px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); background: rgba(255,255,255,.1); color: #fff; font-size: 18px; font-weight: bold; cursor: pointer; transition: all .3s; }
+.count-btn:hover, .count-btn.selected { background: var(--gold); color: #222; border-color: var(--gold); transform: scale(1.15); }
+.char-selection { display: flex; gap: 12px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; max-width: 700px; }
+.char-card { width: 70px; height: 85px; border-radius: 14px; background: rgba(255,255,255,.08); border: 2px solid transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all .3s; font-size: 28px; }
+.char-card:hover, .char-card.selected { border-color: var(--gold); background: rgba(255,215,0,.15); transform: scale(1.1); }
+.char-card.assigned { opacity: .35; cursor: not-allowed; border-color: transparent; }
+.char-card .char-name { font-size: 11px; margin-top: 4px; }
+#selectedChars { margin-bottom: 18px; font-size: 15px; min-height: 24px; color: var(--gold); }
+.start-btn { padding: 16px 55px; font-size: 20px; font-weight: bold; background: linear-gradient(135deg,#ff6b6b,#ee5a24); color: #fff; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 6px 25px rgba(238,90,36,.4); transition: all .3s; }
+.start-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 35px rgba(238,90,36,.6); }
+.menu-btns { display: flex; gap: 15px; margin-top: 20px; }
+.save-btn { padding: 10px 22px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); color: #fff; border-radius: 10px; cursor: pointer; transition: all .3s; font-size: 14px; backdrop-filter: blur(10px); }
+.save-btn:hover { background: rgba(255,255,255,.25); transform: translateY(-2px); }
+
+/* ===== GAME BOARD - 3D HORIZONTAL RING (ENLARGED & TILTED) ===== */
+.scene-3d { 
+  perspective: 1400px; 
+  width: 100vw; 
+  height: 100vh; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  position: relative; 
+  overflow: hidden;
+  cursor: grab;
+}
+.scene-3d:active {
+  cursor: grabbing;
+}
+.world-3d { 
+  transform-style: preserve-3d; 
+  position: relative; 
+  width: 900px; 
+  height: 900px; 
+  transition: transform 1.2s ease;
+  transform: rotateX(18deg) rotateY(0deg) rotateZ(2deg);
+}
+
+/* Board Ring - horizontal like Saturn ring, LARGER */
+.board-ring {
+  position: absolute;
+  width: 800px;
+  height: 800px;
+  left: 50px;
+  top: 50px;
+  transform-style: preserve-3d;
+  transform: rotateX(75deg);
+  background: radial-gradient(circle, rgba(30,30,60,.6) 0%, rgba(20,20,50,.7) 50%, rgba(15,15,40,.8) 100%);
+  border-radius: 50%;
+  box-shadow: inset 0 0 100px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.1);
+}
+
+/* Decorative ring layers */
+.ring-glow {
+  position: absolute;
+  width: 860px;
+  height: 860px;
+  left: 20px;
+  top: 20px;
+  transform: rotateX(75deg) rotateY(180deg);
+  border-radius: 50%;
+  border: 4px solid rgba(255,215,0,.2);
+  box-shadow: 0 0 60px rgba(255,215,0,.15), inset 0 0 60px rgba(255,215,0,.08);
+  pointer-events: none;
+}
+
+.ring-inner {
+  position: absolute;
+  width: 560px;
+  height: 560px;
+  left: 170px;
+  top: 170px;
+  transform: rotateX(75deg) rotateY(180deg);
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.1);
+  background: radial-gradient(circle, rgba(50,40,100,.5) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ===== CELLS - Horizontal Ring Layout ===== */
+.cell {
+  position: absolute;
+  width: 85px;
+  height: 85px;
+  transform-style: preserve-3d;
+  cursor: pointer;
+  transition: all .35s cubic-bezier(.34,1.56,.64,1);
+  z-index: 20;
+}
+.cell:hover {
+  transform: translateZ(30px) scale(1.15);
+  z-index: 50;
+}
+.cell-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  text-align: center;
+  padding: 5px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.2);
+  border: 2px solid rgba(255,255,255,.25);
+}
+.cell-front {
+  background: linear-gradient(135deg, rgba(52, 152, 219, 1), rgba(41, 128, 185, 1));
+  transform: translateZ(18px);
+}
+.cell-back {
+  background: linear-gradient(135deg, rgba(44, 62, 80, .95), rgba(52, 73, 94, .95));
+  transform: rotateY(180deg) translateZ(18px);
+}
+.cell-top {
+  background: rgba(255,255,255,.12);
+  transform: rotateX(90deg) translateZ(42.5px);
+  height: 36px;
+  border-radius: 14px;
+}
+.cell-right {
+  background: rgba(255,255,255,.06);
+  transform: rotateY(90deg) translateZ(42.5px);
+  width: 36px;
+  left: 24.5px;
+  border-radius: 4px;
+}
+.cell-left {
+  background: rgba(255,255,255,.06);
+  transform: rotateY(-90deg) translateZ(42.5px);
+  width: 36px;
+  left: 24.5px;
+  border-radius: 4px;
+}
+.cell-bottom {
+  background: rgba(0,0,0,.35);
+  transform: rotateX(-90deg) translateZ(42.5px);
+  height: 36px;
+  border-radius: 14px;
+}
+
+/* Cell type colors */
+.cell.start .cell-front {
+  background: linear-gradient(135deg, rgba(46, 204, 113, 1), rgba(39, 174, 96, 1));
+  border-color: rgba(46, 204, 113, .6);
+  box-shadow: 0 0 20px rgba(46, 204, 113, .5);
+}
+.cell.chance .cell-front {
+  background: linear-gradient(135deg, rgba(155, 89, 182, 1), rgba(142, 68, 173, 1));
+  border-color: rgba(155, 89, 182, .6);
+  box-shadow: 0 0 20px rgba(155, 89, 182, .5);
+}
+.cell.special .cell-front {
+  background: linear-gradient(135deg, rgba(231, 76, 60, .95), rgba(192, 57, 43, .95));
+}
+
+.cell-icon { font-size: 24px; margin-bottom: 3px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+.cell-name { font-weight: bold; font-size: 12px; line-height: 1.2; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+
+/* Current cell highlight */
+.cell.current-cell .cell-front {
+  border-color: var(--gold);
+  box-shadow: 0 0 25px rgba(255,215,0,.6), inset 0 0 25px rgba(255,215,0,.3);
+  animation: cellPulse 2s infinite;
+}
+@keyframes cellPulse { 0%,100%{box-shadow:0 0 20px rgba(255,215,0,.5)} 50%{box-shadow:0 0 40px rgba(255,215,0,.8)} }
+
+/* ===== CENTER HUB ===== */
+.center-hub {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  left: 310px;
+  top: 310px;
+  transform: translateZ(100px) rotateX(75deg) rotateY(180deg);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(50,50,100,.9) 0%, rgba(30,30,70,.95) 60%, rgba(20,20,50,1) 80%);
+  border: 3px solid rgba(255,215,0,.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(15px);
+  box-shadow: 0 0 60px rgba(255,215,0,.3), inset 0 0 50px rgba(255,215,0,.1), 0 0 0 8px rgba(255,215,0,.1);
+}
+.center-hub h2 { font-size: 56px; margin-bottom: 8px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.5)); }
+.center-hub p { font-size: 16px; opacity: .8; letter-spacing: 4px; }
+
+/* ===== PLAYER TOKENS ===== */
+.player-token {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: bold;
+  box-shadow: 0 6px 20px rgba(0,0,0,.5), inset 0 2px 6px rgba(255,255,255,.4);
+  transition: all .6s cubic-bezier(.34,1.56,.64,1);
+  z-index: 100;
+  border: 3px solid white;
+  transform: translateZ(35px);
+  text-shadow: 0 1px 2px rgba(0,0,0,.5);
+}
+.player-token.p1 { background: linear-gradient(135deg, #ff4757, #c44569); }
+.player-token.p2 { background: linear-gradient(135deg, #2ed573, #26af61); }
+.player-token.p3 { background: linear-gradient(135deg, #1e90ff, #1c7ed6); }
+.player-token.p4 { background: linear-gradient(135deg, #ffa502, #e67e22); }
+.player-token.active {
+  animation: tokenBounce 1.2s infinite;
+  z-index: 110;
+  box-shadow: 0 0 25px currentColor;
+}
+@keyframes tokenBounce { 0%,100%{transform:translateZ(35px) scale(1)} 50%{transform:translateZ(55px) scale(1.2)} }
+
+/* ===== DICE ===== */
+.dice-container { position: fixed; right: 30px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 20px; z-index: 300; }
+.dice-3d { width: 90px; height: 90px; transform-style: preserve-3d; position: relative; }
+.dice-face { position: absolute; width: 90px; height: 90px; background: linear-gradient(145deg, #fff, #e0e0e0); border: 2px solid #bbb; border-radius: 16px; display: grid; grid-template-columns: repeat(3,1fr); grid-template-rows: repeat(3,1fr); padding: 10px; box-shadow: inset 0 0 15px rgba(0,0,0,.1); }
+.dot { width: 16px; height: 16px; background: #333; border-radius: 50%; align-self: center; justify-self: center; box-shadow: inset 0 1px 3px rgba(0,0,0,.5); }
+.dice-face:nth-child(1){transform:translateZ(45px)} .dice-face:nth-child(2){transform:rotateY(180deg)translateZ(45px)}
+.dice-face:nth-child(3){transform:rotateY(90deg)translateZ(45px)} .dice-face:nth-child(4){transform:rotateY(-90deg)translateZ(45px)}
+.dice-face:nth-child(5){transform:rotateX(90deg)translateZ(45px)} .dice-face:nth-child(6){transform:rotateX(-90deg)translateZ(45px)}
+.dice-3d.rolling { animation: diceRoll 1.2s ease-in-out; }
+@keyframes diceRoll { 0%{transform:rotateX(0)rotateY(0)rotateZ(0)} 25%{transform:rotateX(720deg)rotateY(360deg)rotateZ(180deg)} 50%{transform:rotateX(1440deg)rotateY(720deg)rotateZ(360deg)} 75%{transform:rotateX(1800deg)rotateY(1080deg)rotateZ(540deg)} 100%{transform:rotateX(2160deg)rotateY(1440deg)rotateZ(720deg)} }
+.roll-btn { padding: 16px 32px; font-size: 18px; font-weight: bold; background: linear-gradient(135deg,#ff6b6b,#ee5a24); color: #fff; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 20px rgba(238,90,36,.4); transition: all .3s; }
+.roll-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(238,90,36,.6); }
+.roll-btn:disabled { background: #555; cursor: not-allowed; box-shadow: none; opacity: .6; }
+
+/* ===== PLAYER PANEL ===== */
+.player-panel { position: fixed; left: 20px; top: 20px; display: flex; flex-direction: column; gap: 12px; z-index: 300; max-width: 230px; }
+.player-card { background: rgba(20,20,40,.95); backdrop-filter: blur(12px); border-radius: 16px; padding: 14px 16px; border: 2px solid rgba(255,255,255,.1); transition: all .3s; position: relative; overflow: hidden; }
+.player-card.active { border-color: var(--gold); box-shadow: 0 0 20px rgba(255,215,0,.25), inset 0 0 20px rgba(255,215,0,.05); background: rgba(30,30,50,.95); }
+.player-card.skip-turn { opacity: .45; border-color: rgba(255,71,87,.5); }
+.player-card.skip-turn::after { content:"⏸️ 暂停"; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(255,71,87,.9); padding:4px 10px; border-radius:6px; font-size:12px; font-weight:bold; }
+.player-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.player-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid rgba(255,255,255,.8); box-shadow: 0 2px 10px rgba(0,0,0,.3); }
+.player-info h4 { font-size: 14px; margin-bottom: 2px; }
+.player-stats { display: flex; gap: 12px; font-size: 13px; }
+.stat-correct { color: #2ed573; font-weight: bold; }
+.stat-wrong { color: #ff4757; font-weight: bold; }
+.progress-bar { width: 100%; height: 6px; background: rgba(255,255,255,.15); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg,#2ed573,#26af61); border-radius: 3px; transition: width .5s ease; box-shadow: 0 0 10px rgba(46,213,115,.3); }
+
+/* ===== TURN INDICATOR ===== */
+.turn-indicator { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 32px; background: rgba(20,20,40,.95); backdrop-filter: blur(12px); border-radius: 50px; border: 2px solid var(--gold); font-size: 18px; font-weight: bold; z-index: 300; display: flex; align-items: center; gap: 10px; box-shadow: 0 5px 25px rgba(0,0,0,.4); }
+.turn-indicator .player-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 8px currentColor; }
+
+/* ===== QUIZ MODAL ===== */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(5,5,15,.92);
+  backdrop-filter: blur(15px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+  opacity: 0; pointer-events: none;
+  transition: opacity .35s ease;
+}
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+.quiz-modal {
+  width: 720px; max-width: 92vw;
+  background: linear-gradient(145deg, #1e1e3f, #2d2d5a);
+  border-radius: 24px; padding: 40px;
+  border: 2px solid rgba(255,215,0,.3);
+  box-shadow: 0 25px 70px rgba(0,0,0,.6), 0 0 40px rgba(255,215,0,.1);
+  transform: scale(.92);
+  transition: transform .35s ease;
+  position: relative;
+  z-index: 10000;
+}
+.modal-overlay.show .quiz-modal { transform: scale(1); }
+.quiz-location { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,.15); }
+.quiz-location-icon { font-size: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
+.quiz-location h3 { font-size: 24px; letter-spacing: 1px; }
+.quiz-location p { font-size: 14px; opacity: .7; margin-top: 3px; }
+.quiz-question { font-size: 20px; line-height: 1.7; margin-bottom: 22px; padding: 20px 24px; background: rgba(0,0,0,.35); border-radius: 14px; border-left: 4px solid var(--gold); box-shadow: inset 0 0 20px rgba(0,0,0,.2); }
+.quiz-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; position: relative; z-index: 10001; }
+.option-btn {
+  padding: 16px 20px; background: rgba(255,255,255,.08);
+  border: 2px solid rgba(255,255,255,.18); border-radius: 12px;
+  color: #fff; font-size: 17px; cursor: pointer;
+  transition: all .25s ease; text-align: left;
+  display: flex; align-items: center; gap: 14px;
+  position: relative; z-index: 10001;
+  user-select: none; -webkit-user-select: none;
+}
+.option-btn:hover:not(.disabled) { background: rgba(255,255,255,.18); border-color: #74b9ff; transform: translateX(6px); box-shadow: 0 4px 15px rgba(116,185,255,.15); }
+.option-btn.correct { background: rgba(46,213,115,.25) !important; border-color: #2ed573 !important; box-shadow: 0 0 20px rgba(46,213,115,.2); }
+.option-btn.wrong { background: rgba(255,71,87,.25) !important; border-color: #ff4757 !important; }
+.option-btn.disabled { cursor: default; opacity: .65; pointer-events: none; }
+.option-label { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.15); display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; font-size: 16px; transition: all .3s; }
+.option-btn:hover:not(.disabled) .option-label { background: rgba(116,185,255,.3); }
+.option-btn.correct .option-label { background: rgba(46,213,115,.4) !important; }
+.option-btn.wrong .option-label { background: rgba(255,71,87,.4) !important; }
+
+.explanation { padding: 20px; background: rgba(116,185,255,.15); border-radius: 12px; border-left: 4px solid #74b9ff; margin-top: 12px; line-height: 1.7; display: none; font-size: 16px; }
+.explanation.show { display: block; animation: fadeIn .5s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px; }
+.action-btn { padding: 14px 32px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: all .3s; z-index: 10001; position: relative; }
+.action-btn.primary { background: linear-gradient(135deg,#74b9ff,#0984e3); color: #fff; box-shadow: 0 4px 15px rgba(116,185,255,.3); }
+.action-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+.action-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* ===== GAME OVER ===== */
+.winner-display { text-align: center; animation: winnerPop 1s ease; }
+@keyframes winnerPop { 0%{transform:scale(0);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
+.winner-trophy { font-size: 120px; margin-bottom: 15px; filter: drop-shadow(0 4px 10px rgba(255,215,0,.4)); }
+.winner-name { font-size: 38px; margin-bottom: 8px; color: var(--gold); text-shadow: 0 0 20px rgba(255,215,0,.3); }
+.final-stats { display: flex; gap: 25px; margin: 25px 0; justify-content: center; flex-wrap: wrap; }
+.final-stat { text-align: center; padding: 20px 30px; background: rgba(255,255,255,.1); border-radius: 16px; border: 1px solid rgba(255,255,255,.15); }
+.final-stat-value { font-size: 38px; font-weight: bold; color: var(--gold); }
+.final-stat-label { font-size: 14px; opacity: .8; margin-top: 5px; }
+
+/* ===== LOG ===== */
+.game-log { position: fixed; bottom: 20px; left: 20px; width: 320px; max-height: 200px; background: rgba(20,20,40,.95); backdrop-filter: blur(10px); border-radius: 12px; padding: 14px; overflow-y: auto; font-size: 13px; z-index: 300; border: 1px solid rgba(255,255,255,.1); }
+.game-log::-webkit-scrollbar { width: 5px; }
+.game-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); border-radius: 3px; }
+.log-entry { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.08); opacity: .9; line-height: 1.4; }
+.log-entry:last-child { border-bottom: none; }
+.log-title { font-weight: bold; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,.15); padding-bottom: 5px; font-size: 14px; color: var(--gold); }
+
+/* ===== SAVE PANEL ===== */
+.save-panel { position: fixed; bottom: 20px; right: 20px; display: flex; gap: 10px; z-index: 300; }
+.save-btn { padding: 12px 24px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); color: #fff; border-radius: 10px; cursor: pointer; transition: all .3s; font-size: 14px; backdrop-filter: blur(10px); }
+.save-btn:hover { background: rgba(255,255,255,.25); transform: translateY(-2px); }
+
+/* ===== CHINA THEME ===== */
+body.theme-china { background: linear-gradient(135deg, #4a0e0e 0%, #8b0000 50%, #dc143c 100%); }
+body.theme-china .cell-front { background: linear-gradient(135deg, rgba(200,50,50,1), rgba(120,20,20,1)) !important; border-color: rgba(255,200,100,.5) !important; }
+body.theme-china .cell.chance .cell-front { background: linear-gradient(135deg, rgba(180,120,40,1), rgba(140,90,30,1)) !important; }
+body.theme-china .game-title { background: linear-gradient(90deg,#ffd700,#ff6347,#dc143c); -webkit-background-clip: text; background-clip: text; }
+
+/* ===== CONFETTI ===== */
+.confetti { position: fixed; width: 10px; height: 10px; top: -10px; z-index: 9998; animation: confettiFall linear forwards; }
+@keyframes confettiFall { to { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+
+/* ===== FLOATING ===== */
+.floating { animation: float 4s ease infinite; }
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+
+/* ===== ANGLE CONTROL ===== */
+.angle-control {
+  position: fixed;
+  right: 30px;
+  top: calc(50% + 130px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 300;
+  background: rgba(20,20,40,.85);
+  backdrop-filter: blur(10px);
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.15);
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  align-items: center;
+}
+.angle-control-title {
+  font-size: 12px;
+  text-align: center;
+  opacity: .8;
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+  color: var(--gold);
+}
+.angle-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.2);
+  background: rgba(255,255,255,.1);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+.angle-btn:hover {
+  background: rgba(255,255,255,.2);
+  border-color: rgba(255,255,255,.4);
+  transform: scale(1.1);
+}
+.angle-btn.active {
+  background: rgba(255,215,0,.25);
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 12px rgba(255,215,0,.3);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1400px) {
+  .world-3d { transform: rotateX(18deg) rotateY(0deg) rotateZ(2deg) scale(0.85) !important; }
+}
+@media (max-width: 1100px) {
+  .world-3d { transform: rotateX(18deg) rotateY(0deg) rotateZ(2deg) scale(0.7) !important; }
+  .player-panel { max-width: 190px; }
+  .dice-container { right: 15px; }
+  .angle-control { right: 15px; }
+}
+@media (max-width: 768px) {
+  .angle-control {
+    right: 10px;
+    top: auto;
+    bottom: 80px;
+    flex-direction: row;
+    padding: 8px;
+  }
+  .angle-control-title { display: none; }
+  .angle-btn { width: 38px; height: 38px; font-size: 12px; }
+}
+</style>
+<base target="_blank">
+<base target="_blank">
+</head>
+<body>
+
+<!-- START SCREEN -->
+<div id="startScreen" class="screen">
+  <div class="game-title floating">🌍 环球知识大富翁</div>
+  <div class="game-subtitle">在3D星环世界中旅行，用知识征服棋盘</div>
+
+  <div style="margin-bottom:15px;font-size:17px;font-weight:bold;">🗺️ 选择冒险地图</div>
+  <div class="map-selection">
+    <div class="map-card selected" data-map="world" onclick="selectMap('world')">
+      <div class="map-icon">🌏</div>
+      <h3>世界之旅</h3>
+      <p>25个国家地区<br>125道精选题目</p>
+    </div>
+    <div class="map-card" data-map="china" onclick="selectMap('china')">
+      <div class="map-icon">🏯</div>
+      <h3>中华之旅</h3>
+      <p>19个省市地区<br>95道精选题目</p>
+    </div>
+  </div>
+
+  <div style="margin-bottom:12px;font-size:17px;font-weight:bold;">👥 玩家人数</div>
+  <div class="player-count">
+    <button class="count-btn" onclick="selectCount(1)">1</button>
+    <button class="count-btn selected" onclick="selectCount(2)">2</button>
+    <button class="count-btn" onclick="selectCount(3)">3</button>
+    <button class="count-btn" onclick="selectCount(4)">4</button>
+  </div>
+
+  <div style="margin-bottom:12px;font-size:17px;font-weight:bold;">🎭 选择角色（点击分配）</div>
+  <div class="char-selection" id="charSelection">
+    <div class="char-card" data-char="🧑‍🚀" onclick="selectChar('🧑‍🚀','宇航员')"><div>🧑‍🚀</div><div class="char-name">宇航员</div></div>
+    <div class="char-card" data-char="👩‍🎨" onclick="selectChar('👩‍🎨','艺术家')"><div>👩‍🎨</div><div class="char-name">艺术家</div></div>
+    <div class="char-card" data-char="👨‍🔬" onclick="selectChar('👨‍🔬','科学家')"><div>👨‍🔬</div><div class="char-name">科学家</div></div>
+    <div class="char-card" data-char="🕵️" onclick="selectChar('🕵️','探险家')"><div>🕵️</div><div class="char-name">探险家</div></div>
+    <div class="char-card" data-char="🧙" onclick="selectChar('🧙','魔法师')"><div>🧙</div><div class="char-name">魔法师</div></div>
+    <div class="char-card" data-char="🦸" onclick="selectChar('🦸','超级英雄')"><div>🦸</div><div class="char-name">超级英雄</div></div>
+    <div class="char-card" data-char="🧛" onclick="selectChar('🧛','吸血鬼')"><div>🧛</div><div class="char-name">吸血鬼</div></div>
+    <div class="char-card" data-char="🤖" onclick="selectChar('🤖','机器人')"><div>🤖</div><div class="char-name">机器人</div></div>
+  </div>
+
+  <div id="selectedChars" style="margin-bottom:18px;font-size:15px;min-height:24px;color:var(--gold);"></div>
+
+  <button class="start-btn" onclick="startGame()">🚀 开始冒险</button>
+  <div class="menu-btns">
+    <button class="save-btn" onclick="loadGame()">📂 读取存档</button>
+  </div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="gameScreen" class="screen hidden">
+  <div class="scene-3d" id="scene3d">
+    <div class="world-3d" id="world3d">
+      <!-- Decorative rings -->
+      <div class="ring-glow"></div>
+      <div class="ring-inner"></div>
+
+      <!-- Board ring for cells -->
+      <div class="board-ring" id="boardRing"></div>
+
+      <!-- Center hub -->
+      <div class="center-hub">
+        <h2 id="centerTitle">🌍</h2>
+        <p>知识大富翁</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="turn-indicator" id="turnIndicator">
+    <div class="player-dot" id="turnDot"></div>
+    <span id="turnText">玩家 1 的回合</span>
+  </div>
+
+  <div class="player-panel" id="playerPanel"></div>
+
+  <div class="dice-container">
+    <div class="dice-3d" id="dice3d">
+      <div class="dice-face"><div class="dot" style="grid-column:2;grid-row:2"></div></div>
+      <div class="dice-face"><div class="dot" style="grid-column:1;grid-row:1"></div><div class="dot" style="grid-column:3;grid-row:3"></div></div>
+      <div class="dice-face"><div class="dot" style="grid-column:1;grid-row:1"></div><div class="dot" style="grid-column:2;grid-row:2"></div><div class="dot" style="grid-column:3;grid-row:3"></div></div>
+      <div class="dice-face"><div class="dot" style="grid-column:1;grid-row:1"></div><div class="dot" style="grid-column:3;grid-row:1"></div><div class="dot" style="grid-column:1;grid-row:3"></div><div class="dot" style="grid-column:3;grid-row:3"></div></div>
+      <div class="dice-face"><div class="dot" style="grid-column:1;grid-row:1"></div><div class="dot" style="grid-column:3;grid-row:1"></div><div class="dot" style="grid-column:2;grid-row:2"></div><div class="dot" style="grid-column:1;grid-row:3"></div><div class="dot" style="grid-column:3;grid-row:3"></div></div>
+      <div class="dice-face"><div class="dot" style="grid-column:1;grid-row:1"></div><div class="dot" style="grid-column:3;grid-row:1"></div><div class="dot" style="grid-column:1;grid-row:2"></div><div class="dot" style="grid-column:3;grid-row:2"></div><div class="dot" style="grid-column:1;grid-row:3"></div><div class="dot" style="grid-column:3;grid-row:3"></div></div>
+    </div>
+    <button class="roll-btn" id="rollBtn" onclick="rollDice()">🎲 投掷骰子</button>
+  </div>
+
+  <div class="angle-control" id="angleControl">
+    <div class="angle-control-title">🧭 视角</div>
+    <button class="angle-btn active" onclick="setFixedAngle(0)" title="正面">0°</button>
+    <button class="angle-btn" onclick="setFixedAngle(90)" title="右侧">90°</button>
+    <button class="angle-btn" onclick="setFixedAngle(180)" title="背面">180°</button>
+    <button class="angle-btn" onclick="setFixedAngle(270)" title="左侧">270°</button>
+    <button class="angle-btn" onclick="setFixedAngle(-1)" title="自由旋转">🔄</button>
+  </div>
+
+  <div class="game-log" id="gameLog">
+    <div class="log-title">📜 对局记录</div>
+  </div>
+
+  <div class="save-panel">
+    <button class="save-btn" onclick="saveGame()">💾 保存游戏</button>
+    <button class="save-btn" onclick="returnToMenu()">🏠 返回主菜单</button>
+  </div>
+</div>
+
+<!-- QUIZ MODAL -->
+<div class="modal-overlay" id="quizModal">
+  <div class="quiz-modal">
+    <div class="quiz-location">
+      <div class="quiz-location-icon" id="quizIcon">📍</div>
+      <div>
+        <h3 id="quizLocation">地区名称</h3>
+        <p id="quizCategory">知识问答</p>
+      </div>
+    </div>
+    <div class="quiz-question" id="quizQuestion">题目内容</div>
+    <div class="quiz-options" id="quizOptions"></div>
+    <div class="explanation" id="explanation"></div>
+    <div class="modal-actions">
+      <button class="action-btn primary" id="quizActionBtn" onclick="closeQuiz()">继续</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div id="gameOverScreen" class="screen hidden">
+  <div class="winner-display">
+    <div class="winner-trophy">🏆</div>
+    <div class="winner-name" id="winnerName">获胜者</div>
+    <p style="font-size:20px;margin-bottom:15px;opacity:.9;">恭喜成为知识大富翁！</p>
+    <div class="final-stats" id="finalStats"></div>
+    <div style="display:flex;gap:18px;margin-top:10px;">
+      <button class="start-btn" onclick="returnToMenu()">🏠 返回主菜单</button>
+      <button class="save-btn" style="padding:16px 40px;font-size:18px;" onclick="saveGame()">💾 保存战绩</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+
+// ==================== GAME DATA ====================
+const WORLD_MAP = [
+  {name:"起点",icon:"🚀",type:"start",desc:"开始环球之旅"},
+  {name:"纽约",icon:"🗽",type:"normal",country:"美国"},
+  {name:"伦敦",icon:"🎡",type:"normal",country:"英国"},
+  {name:"巴黎",icon:"🗼",type:"normal",country:"法国"},
+  {name:"机会",icon:"❓",type:"chance",desc:"随机事件"},
+  {name:"东京",icon:"🗾",type:"normal",country:"日本"},
+  {name:"悉尼",icon:"🦘",type:"normal",country:"澳大利亚"},
+  {name:"开罗",icon:"🐪",type:"normal",country:"埃及"},
+  {name:"莫斯科",icon:"🪆",type:"normal",country:"俄罗斯"},
+  {name:"机会",icon:"❓",type:"chance",desc:"随机事件"},
+  {name:"里约",icon:"🌴",type:"normal",country:"巴西"},
+  {name:"罗马",icon:"🏛️",type:"normal",country:"意大利"},
+  {name:"曼谷",icon:"🛕",type:"normal",country:"泰国"},
+  {name:"迪拜",icon:"🏙️",type:"normal",country:"阿联酋"},
+  {name:"机会",icon:"❓",type:"chance",desc:"随机事件"},
+  {name:"首尔",icon:"🎎",type:"normal",country:"韩国"},
+  {name:"柏林",icon:"🍺",type:"normal",country:"德国"},
+  {name:"马德里",icon:"💃",type:"normal",country:"西班牙"},
+  {name:"伊斯坦布尔",icon:"🕌",type:"normal",country:"土耳其"},
+  {name:"机会",icon:"❓",type:"chance",desc:"随机事件"},
+  {name:"新加坡",icon:"🦁",type:"normal",country:"新加坡"},
+  {name:"温哥华",icon:"🍁",type:"normal",country:"加拿大"},
+  {name:"孟买",icon:"🕌",type:"normal",country:"印度"},
+  {name:"雅典",icon:"🏺",type:"normal",country:"希腊"},
+  {name:"机会",icon:"❓",type:"chance",desc:"随机事件"},
+  {name:"阿姆斯特丹",icon:"🚲",type:"normal",country:"荷兰"},
+  {name:"维也纳",icon:"🎵",type:"normal",country:"奥地利"},
+  {name:"开普敦",icon:"🦁",type:"normal",country:"南非"},
+  {name:"墨西哥城",icon:"🌮",type:"normal",country:"墨西哥"},
+  {name:"机会",icon:"❓",type:"chance",desc:"随机事件"},
+  {name:"威尼斯",icon:"🛶",type:"normal",country:"意大利"},
+  {name:"旧金山",icon:"🌉",type:"normal",country:"美国"}
+];
+
+const CHINA_MAP = [
+  {name:"起点",icon:"🚩",type:"start",desc:"开始中华之旅",x:0.5,y:0.55},
+  {name:"哈尔滨",icon:"❄️",type:"normal",province:"黑龙江",x:0.78,y:0.12},
+  {name:"乌鲁木齐",icon:"🍇",type:"normal",province:"新疆",x:0.15,y:0.22},
+  {name:"敦煌",icon:"🎨",type:"normal",province:"甘肃",x:0.35,y:0.32},
+  {name:"西安",icon:"🐎",type:"normal",province:"陕西",x:0.52,y:0.42},
+  {name:"北京",icon:"🏯",type:"normal",province:"直辖市",x:0.72,y:0.30},
+  {name:"机会",icon:"❓",type:"chance",desc:"随机事件",x:0.85,y:0.38},
+  {name:"青岛",icon:"🌊",type:"normal",province:"山东",x:0.80,y:0.45},
+  {name:"洛阳",icon:"🌸",type:"normal",province:"河南",x:0.62,y:0.48},
+  {name:"南京",icon:"🏛️",type:"normal",province:"江苏",x:0.82,y:0.58},
+  {name:"上海",icon:"🏙️",type:"normal",province:"直辖市",x:0.90,y:0.62},
+  {name:"机会",icon:"❓",type:"chance",desc:"随机事件",x:0.75,y:0.68},
+  {name:"杭州",icon:"🌸",type:"normal",province:"浙江",x:0.85,y:0.72},
+  {name:"苏州",icon:"🎋",type:"normal",province:"江苏",x:0.80,y:0.75},
+  {name:"厦门",icon:"🏝️",type:"normal",province:"福建",x:0.78,y:0.85},
+  {name:"武汉",icon:"🌉",type:"normal",province:"湖北",x:0.60,y:0.62},
+  {name:"张家界",icon:"🌲",type:"normal",province:"湖南",x:0.58,y:0.72},
+  {name:"桂林",icon:"⛰️",type:"normal",province:"广西",x:0.50,y:0.82},
+  {name:"机会",icon:"❓",type:"chance",desc:"随机事件",x:0.40,y:0.75},
+  {name:"重庆",icon:"🌶️",type:"normal",province:"直辖市",x:0.45,y:0.58},
+  {name:"成都",icon:"🐼",type:"normal",province:"四川",x:0.35,y:0.52},
+  {name:"昆明",icon:"🌺",type:"normal",province:"云南",x:0.30,y:0.78},
+  {name:"丽江",icon:"🏔️",type:"normal",province:"云南",x:0.28,y:0.70},
+  {name:"拉萨",icon:"🏔️",type:"normal",province:"西藏",x:0.18,y:0.55},
+  {name:"机会",icon:"❓",type:"chance",desc:"随机事件",x:0.25,y:0.45}
+];
+
+const WORLD_QUESTIONS = {
+"纽约":[
+{q:"自由女神像是哪国送给美国的礼物？",options:["英国","法国","德国","意大利"],a:1,exp:"自由女神像是法国在1886年送给美国的礼物，象征着自由与民主，由弗雷德里克·奥古斯特·巴托尔迪设计。"},
+{q:"纽约证券交易所位于哪条著名街道？",options:["第五大道","华尔街","百老汇","麦迪逊大道"],a:1,exp:"华尔街位于纽约曼哈顿下城，是全球金融中心，纽约证券交易所就坐落于此，'华尔街'已成为美国金融业的代名词。"},
+{q:"纽约时代广场因哪家报社而得名？",options:["纽约时报","华尔街日报","纽约邮报","纽约每日新闻"],a:0,exp:"时代广场原名朗埃克广场，1904年因纽约时报总部迁入而改名为时代广场，现为世界著名的商业和娱乐中心。"},
+{q:"联合国总部大楼位于纽约的哪个区域？",options:["曼哈顿中城","曼哈顿下城","布鲁克林","皇后区"],a:0,exp:"联合国总部大楼位于纽约曼哈顿中城东边的东河沿岸，1949-1951年建成，是国际外交的重要场所。"},
+{q:"中央公园的面积大约是多少？",options:["约200公顷","约340公顷","约500公顷","约100公顷"],a:1,exp:"中央公园面积约340公顷，是纽约市最大的公园，也是全球最著名的城市公园之一，由弗雷德里克·奥姆斯特德设计。"}
+],
+"伦敦":[
+{q:"大本钟实际上是哪座建筑的一部分？",options:["威斯敏斯特宫","伦敦塔","白金汉宫","圣保罗大教堂"],a:0,exp:"大本钟是威斯敏斯特宫（英国议会大厦）北端钟楼的昵称，2012年更名为伊丽莎白塔，钟重13.7吨。"},
+{q:"伦敦地铁是世界上第几条地铁？",options:["第一条","第二条","第三条","第四条"],a:0,exp:"伦敦地铁于1863年开通，是世界上第一条地下铁路系统，当时使用蒸汽机车牵引，现称'Tube'。"},
+{q:"泰晤士河上的伦敦塔桥建于哪一年？",options:["1886年","1894年","1901年","1875年"],a:1,exp:"伦敦塔桥于1894年建成通车，是一座上开悬索桥，也是伦敦的标志性建筑之一，桥塔高65米。"},
+{q:"大英博物馆收藏了著名的什么石碑？",options:["汉谟拉比法典","罗塞塔石碑","死海古卷","贝希斯敦铭文"],a:1,exp:"罗塞塔石碑是大英博物馆的镇馆之宝，上面刻有古埃及象形文字、世俗体和古希腊文三种文字，是破译古埃及文的关键。"},
+{q:"伦敦眼（摩天轮）的高度约为多少米？",options:["100米","120米","135米","150米"],a:2,exp:"伦敦眼高约135米，于2000年开放，曾是世界上最高的摩天轮，现为伦敦著名地标，每年吸引数百万游客。"}
+],
+"巴黎":[
+{q:"埃菲尔铁塔最初建造的目的是什么？",options:["作为观光塔","1889年世博会入口","无线电发射塔","军事瞭望塔"],a:1,exp:"埃菲尔铁塔是为1889年巴黎世界博览会而建造的入口拱门，原计划博览会后拆除，现已成为法国的象征。"},
+{q:"卢浮宫博物馆的前身是什么建筑？",options:["王宫","教堂","城堡","交易所"],a:2,exp:"卢浮宫最初是12世纪的防御城堡，后经历代国王扩建为王宫，法国大革命后改为博物馆，现为世界四大博物馆之首。"},
+{q:"巴黎圣母院属于哪种建筑风格？",options:["罗马式","哥特式","巴洛克式","文艺复兴式"],a:1,exp:"巴黎圣母院是法国哥特式建筑的典范，以其飞扶壁、玫瑰窗和尖拱而闻名于世，始建于1163年。"},
+{q:"塞纳河将巴黎分为哪两部分？",options:["东城和西城","左岸和右岸","北岸和南岸","内城和外城"],a:1,exp:"塞纳河将巴黎分为左岸（南岸，文化区）和右岸（北岸，商业区），这是巴黎独特的城市格局。"},
+{q:"凡尔赛宫位于巴黎的哪个方向？",options:["东","西","南","北"],a:1,exp:"凡尔赛宫位于巴黎西南约20公里处，是路易十四至路易十六时期法国的王宫，以其镜厅和花园闻名。"}
+],
+"东京":[
+{q:"东京晴空塔的高度是多少米？",options:["700米","634米","900米","1000米"],a:1,exp:"东京晴空塔高634米，于2012年建成，是世界第二高建筑，数字634在日语中与'武藏'谐音。"},
+{q:"东京的皇居位于哪座古城遗址上？",options:["江户城","大阪城","名古屋城","熊本城"],a:0,exp:"东京皇居建在江户城遗址上，江户时代德川幕府将军曾在此居住，明治维新后成为皇居，占地约115万平方米。"},
+{q:"新干线最早开通于哪一年？",options:["1960年","1964年","1970年","1955年"],a:1,exp:"东海道新干线于1964年东京奥运会前夕开通，是世界上第一条高速铁路，连接东京和大阪，最高时速210公里。"},
+{q:"浅草寺的标志性大门叫什么？",options:["雷门","风门","火门","水门"],a:0,exp:"雷门是浅草寺的入口，门前悬挂巨型红灯笼，是东京最古老的寺庙和最著名的地标之一，建于公元628年。"},
+{q:"东京迪士尼度假区位于哪个城市？",options:["东京都","千叶县浦安市","神奈川县","埼玉县"],a:1,exp:"东京迪士尼度假区实际位于千叶县浦安市，虽然冠以'东京'之名，但并不在东京都内，1983年开业。"}
+],
+"悉尼":[
+{q:"悉尼歌剧院的设计灵感来源于什么？",options:["贝壳","帆船","花瓣","以上皆是"],a:3,exp:"悉尼歌剧院的设计灵感众说纷纭，设计师约恩·乌松表示灵感来自橘子瓣，但大众普遍认为像贝壳或帆船。"},
+{q:"悉尼海港大桥被当地人昵称为什么？",options:["大衣架","大拱门","铁腰带","钢铁巨兽"],a:0,exp:"悉尼海港大桥因形状酷似衣架而被昵称为'大衣架'，是世界上最高的钢铁拱桥，高134米，1932年通车。"},
+{q:"悉尼位于澳大利亚的哪个海岸？",options:["东海岸","西海岸","南海岸","北海岸"],a:0,exp:"悉尼位于澳大利亚东南海岸，是澳大利亚最大的城市，也是新南威尔士州的首府，建于1788年。"},
+{q:"邦迪海滩以什么运动闻名？",options:["冲浪","潜水","帆船","游泳"],a:0,exp:"邦迪海滩是世界著名的冲浪胜地，每年还举办城市到海滩马拉松赛，是悉尼最具代表性的海滩。"},
+{q:"悉尼塔的高度约为多少米？",options:["250米","309米","350米","400米"],a:1,exp:"悉尼塔高约309米，是悉尼最高的建筑，顶部设有观景台和旋转餐厅，可俯瞰全城，1981年开放。"}
+],
+"开罗":[
+{q:"吉萨金字塔群中最大的是哪座？",options:["哈夫拉金字塔","孟卡拉金字塔","胡夫金字塔","阶梯金字塔"],a:2,exp:"胡夫金字塔是吉萨金字塔群中最大的，原高146.6米，是古代世界七大奇迹中唯一尚存的建筑，建于约公元前2560年。"},
+{q:"狮身人面像守护的是哪座金字塔？",options:["胡夫金字塔","哈夫拉金字塔","孟卡拉金字塔","阿蒙霍特普金字塔"],a:1,exp:"狮身人面像位于哈夫拉金字塔前，据信是按照法老哈夫拉的面容雕刻的，高约20米，长约73米。"},
+{q:"尼罗河是世界第几长河？",options:["第一","第二","第三","第四"],a:0,exp:"尼罗河全长约6650公里，是世界第一长河，流经11个国家，是古埃及文明的发源地，被称为'埃及的生命线'。"},
+{q:"开罗的埃及博物馆成立于哪一年？",options:["1858年","1902年","1922年","1952年"],a:1,exp:"埃及博物馆现馆于1902年在开罗解放广场开放，收藏了超过12万件古埃及文物，包括图坦卡蒙宝藏。"},
+{q:"图坦卡蒙黄金面具发现于哪一年？",options:["1902年","1922年","1932年","1952年"],a:1,exp:"图坦卡蒙墓于1922年被英国考古学家霍华德·卡特发现，出土了大量珍贵文物，包括著名的黄金面具，重约11公斤。"}
+],
+"莫斯科":[
+{q:"红场的名称在俄语中原本是什么意思？",options:["红色广场","美丽的广场","革命广场","中央广场"],a:1,exp:"红场在俄语中'Красная'既有'红色'也有'美丽'之意，原意是'美丽的广场'，并非因红色建筑得名。"},
+{q:"圣瓦西里大教堂以什么特色闻名？",options:["金色穹顶","彩色洋葱头圆顶","哥特式尖顶","罗马式拱门"],a:1,exp:"圣瓦西里大教堂以其九个色彩斑斓的洋葱头圆顶闻名，每个圆顶形状和颜色各不相同，建于1555-1561年。"},
+{q:"莫斯科地铁被誉为什么？",options:["地下宫殿","钢铁巨龙","时光隧道","艺术长廊"],a:0,exp:"莫斯科地铁 stations 装饰华丽，大量使用大理石、马赛克和吊灯，被誉为'地下宫殿'，1935年开通。"},
+{q:"克里姆林宫城墙的长度约为多少？",options:["约1公里","约2.2公里","约5公里","约3公里"],a:1,exp:"克里姆林宫城墙长约2235米，厚3.5-6.5米，高5-19米，共有20座塔楼环绕，建于1485-1495年。"},
+{q:"莫斯科大学主楼属于什么建筑风格？",options:["巴洛克式","斯大林式建筑","现代主义","新古典主义"],a:1,exp:"莫斯科大学主楼是典型的斯大林式建筑（帝国风格），是莫斯科'七姐妹'摩天大楼之一，高240米，1953年建成。"}
+],
+"里约":[
+{q:"基督救世主像位于里约的哪座山上？",options:["面包山","科尔科瓦多山","提吉卡山","甜面包山"],a:1,exp:"基督像位于科尔科瓦多山（驼背山）山顶，高38米，臂展28米，是里约热内卢的标志，1931年建成。"},
+{q:"里约狂欢节通常在几月举行？",options:["一月","二月或三月","四月","十二月"],a:1,exp:"里约狂欢节在复活节前40天（大斋期前）举行，通常在二月或三月，是世界上最大的狂欢节，吸引数百万人参与。"},
+{q:"科帕卡巴纳海滩的长度约为多少公里？",options:["2公里","4公里","6公里","8公里"],a:1,exp:"科帕卡巴纳海滩长约4公里，以其独特的黑白相间人行道图案闻名于世，是里约最著名的海滩。"},
+{q:"巴西的官方语言是什么？",options:["西班牙语","葡萄牙语","法语","英语"],a:1,exp:"巴西是南美洲唯一以葡萄牙语为官方语言的国家，这源于其曾是葡萄牙殖民地的历史，1822年独立。"},
+{q:"亚马逊雨林大部分位于哪个国家？",options:["秘鲁","哥伦比亚","巴西","委内瑞拉"],a:2,exp:"亚马逊雨林约60%位于巴西境内，其余分布在秘鲁、哥伦比亚等8个国家，被称为'地球之肺'，面积约550万平方公里。"}
+],
+"罗马":[
+{q:"罗马斗兽场最多可容纳多少观众？",options:["3万人","5万人","8万人","10万人"],a:1,exp:"罗马斗兽场（弗拉维圆形剧场）可容纳约5-8万名观众，建于公元72-80年间，是古罗马文明的象征。"},
+{q:"'条条大路通罗马'这句谚语起源于什么？",options:["罗马帝国的道路系统","罗马的地理位置","罗马的贸易网络","罗马的宗教信仰"],a:0,exp:"罗马帝国修建了超过40万公里的道路，以罗马为中心辐射各地，因此产生'条条大路通罗马'的谚语。"},
+{q:"梵蒂冈城国位于罗马的哪个位置？",options:["市中心","西北部","东南部","郊区"],a:1,exp:"梵蒂冈城国位于罗马城西北角，是世界上面积最小（0.44平方公里）和人口最少的国家，是天主教中心。"},
+{q:"特莱维喷泉投币许愿的传统起源于哪部电影？",options:["《罗马假日》","《甜蜜的生活》","《三枚硬币》","《罗马之恋》"],a:2,exp:"虽然投币许愿的习俗更早就有，但广为流传是因为1954年电影《三枚硬币》(Three Coins in the Fountain)。"},
+{q:"古罗马的公共浴场除了洗澡还有什么功能？",options:["社交和健身","宗教仪式","政治会议","商业交易"],a:0,exp:"古罗马浴场是社交中心，设有图书馆、健身房、花园和会议室，是罗马人日常生活的重要场所，卡拉卡拉浴场可同时容纳1600人。"}
+],
+"曼谷":[
+{q:"曼谷的全名在吉尼斯世界纪录中是什么？",options:["最长的首都名","最古老的首都名","最多音节的首都名","最难发音的首都名"],a:0,exp:"曼谷的全名共有167个拉丁字母，是世界上最长的首都名称，意为'天使之城、宏伟之城、永恒的宝石之城'等。"},
+{q:"泰国传统舞蹈孔剧的表演者戴什么面具？",options:["动物面具","鬼神面具","猴子面具","以上皆有"],a:3,exp:"孔剧是泰国古典舞剧，表演者戴各种面具，包括猴子（哈奴曼）、鬼神和魔王等角色面具，2005年列入非遗。"},
+{q:"大皇宫建于哪个王朝时期？",options:["素可泰王朝","大城王朝","吞武里王朝","扎克里王朝"],a:3,exp:"大皇宫建于1782年扎克里王朝（曼谷王朝）拉玛一世时期，是泰国王室的主要宫殿，占地21.84万平方米。"},
+{q:"泰国的水灯节通常在几月举行？",options:["五月","十一月","一月","八月"],a:1,exp:"水灯节（Loy Krathong）在泰历12月15日（公历11月）举行，人们放水灯祈求好运，是泰国最浪漫的节日。"},
+{q:"郑王庙（黎明寺）的塔高约为多少米？",options:["50米","67米","82米","100米"],a:2,exp:"郑王庙中央塔高约82米，是曼谷最高的寺庙建筑，以其彩色陶瓷装饰而闻名，建于19世纪。"}
+],
+"迪拜":[
+{q:"哈利法塔的高度是多少米？",options:["700米","828米","900米","1000米"],a:1,exp:"哈利法塔高828米，共163层，自2010年以来一直是世界最高建筑，造价约15亿美元。"},
+{q:"棕榈岛属于什么类型的人工岛？",options:["圆形","棕榈树形","星形","方形"],a:1,exp:"朱美拉棕榈岛呈棕榈树形状，由树干、17片树叶和月牙形防波堤组成，是世界最大人工岛之一。"},
+{q:"迪拜位于哪个半岛？",options:["阿拉伯半岛","西奈半岛","伊比利亚半岛","印度半岛"],a:0,exp:"迪拜位于阿拉伯半岛东南海岸，是阿联酋七个酋长国之一，也是人口最多的城市，1971年独立。"},
+{q:"迪拜购物中心内有什么著名景点？",options:["室内滑雪场","水族馆","溜冰场","以上皆有"],a:3,exp:"迪拜购物中心拥有室内滑雪场、巨大水族馆和奥运标准溜冰场，是世界最大的购物中心之一，占地约111万平方米。"},
+{q:"迪拜传统市集（Souk）主要售卖什么？",options:["电子产品","黄金和香料","服装","家具"],a:1,exp:"迪拜黄金市场和香料市场是传统市集的代表，黄金市场拥有超过300家店铺，是世界上最大的黄金市场之一。"}
+],
+"首尔":[
+{q:"景福宫是朝鲜王朝的什么宫殿？",options:["东宫","西宫","正宫","离宫"],a:2,exp:"景福宫是朝鲜王朝的正宫（法宫），建于1395年，位于首尔北部，是首尔五大宫之首，占地约50万平方米。"},
+{q:"首尔塔位于哪座山上？",options:["南山","北山","仁王山","冠岳山"],a:0,exp:"首尔塔（N塔）位于南山山顶，高236.7米，是首尔的地标和情侣约会圣地，2005年开放。"},
+{q:"韩国传统服饰叫什么？",options:["和服","韩服","旗袍","纱丽"],a:1,exp:"韩服是韩国传统服饰，特点是色彩鲜艳、线条优美，女性穿赤古里裙，男性穿赤古里裤，已有2000多年历史。"},
+{q:"明洞以什么闻名？",options:["传统文化","购物和美食","历史古迹","自然风光"],a:1,exp:"明洞是首尔最著名的购物区，汇集了国际品牌和韩国本土化妆品店，也是街头美食的天堂，被称为'购物圣地'。"},
+{q:"清溪川复原工程完成于哪一年？",options:["2002年","2005年","2008年","2010年"],a:1,exp:"清溪川复原工程于2005年完成，将覆盖在混凝土下的河流重新开放，成为首尔市中心的重要生态走廊。"}
+],
+"柏林":[
+{q:"柏林墙倒塌于哪一天？",options:["1989年11月9日","1990年10月3日","1989年10月9日","1991年11月9日"],a:0,exp:"柏林墙于1989年11月9日倒塌，标志着冷战结束和德国统一的开始，这一天后来成为德国统一日。"},
+{q:"勃兰登堡门是什么风格的建筑？",options:["罗马式","哥特式","新古典主义","巴洛克式"],a:2,exp:"勃兰登堡门建于1788-1791年，采用新古典主义风格，以雅典卫城山门为原型，是柏林的象征，高26米。"},
+{q:"柏林国会大厦的穹顶由谁设计？",options:["贝聿铭","诺曼·福斯特","弗兰克·盖里","扎哈·哈迪德"],a:1,exp:"英国建筑师诺曼·福斯特于1999年完成了国会大厦玻璃穹顶的设计，象征着政治透明，高23.5米。"},
+{q:"柏林的博物馆岛被列入什么遗产？",options:["世界自然遗产","世界文化遗产","世界记忆遗产","非物质文化遗产"],a:1,exp:"博物馆岛于1999年列入世界文化遗产，岛上拥有五座世界闻名的博物馆，建于1824-1930年间。"},
+{q:"柏林电影节最高奖项叫什么？",options:["金狮奖","金棕榈奖","金熊奖","奥斯卡奖"],a:2,exp:"柏林国际电影节最高奖项是金熊奖，始于1951年，是世界三大电影节之一，每年2月举行。"}
+],
+"马德里":[
+{q:"普拉多博物馆以收藏哪个画派的作品闻名？",options:["印象派","抽象派","西班牙古典画派","立体派"],a:2,exp:"普拉多博物馆收藏了大量西班牙古典画派作品，包括戈雅、委拉斯凯兹和埃尔·格列柯的杰作，1819年开馆。"},
+{q:"马德里皇宫是欧洲第几大的皇宫？",options:["第一大","第二大","第三大","第四大"],a:2,exp:"马德里皇宫面积约13.5万平方米，是欧洲第三大皇宫，仅次于凡尔赛宫和维也纳皇宫，有3418个房间。"},
+{q:"马约尔广场（主广场）建于哪个世纪？",options:["16世纪","17世纪","18世纪","19世纪"],a:0,exp:"马约尔广场建于1619年（腓力三世时期），是马德里市中心最著名的广场，呈长方形，长128米，宽94米。"},
+{q:"皇家马德里足球俱乐部成立于哪一年？",options:["1899年","1902年","1905年","1910年"],a:1,exp:"皇家马德里成立于1902年，是西班牙最成功的足球俱乐部，拥有14座欧冠奖杯，被称为'银河战舰'。"},
+{q:"马德里位于伊比利亚半岛的什么位置？",options:["东北部","中部","西南部","东南部"],a:1,exp:"马德里位于伊比利亚半岛中部，海拔约667米，是欧洲海拔最高的首都城市，也是西班牙的政治中心。"}
+],
+"伊斯坦布尔":[
+{q:"圣索菲亚大教堂最初是什么宗教的建筑？",options:["清真寺","东正教教堂","天主教教堂","犹太会堂"],a:1,exp:"圣索菲亚大教堂于537年建成，最初是东正教教堂，后改为清真寺，现为博物馆兼清真寺，直径31米的穹顶令人震撼。"},
+{q:"博斯普鲁斯海峡连接哪两个海域？",options:["黑海和地中海","黑海和马尔马拉海","红海和地中海","里海和黑海"],a:1,exp:"博斯普鲁斯海峡连接黑海和马尔马拉海，将伊斯坦布尔分为欧洲区和亚洲区，长约30公里。"},
+{q:"蓝色清真寺因什么而得名？",options:["蓝色的圆顶","蓝色的伊兹尼克瓷砖","蓝色的灯光","蓝色的地毯"],a:1,exp:"蓝色清真寺（苏丹艾哈迈德清真寺）内部装饰有超过2万块蓝色伊兹尼克瓷砖，因此得名，建于1609-1616年。"},
+{q:"大巴扎是世界上什么类型的最大市场？",options:["露天市场","有盖市场","水上市场","夜市"],a:1,exp:"大巴扎是世界上最大、最古老的有盖市场之一，拥有61条街道和4000多家店铺，建于1461年。"},
+{q:"伊斯坦布尔曾是哪三个帝国的首都？",options:["罗马、拜占庭、奥斯曼","希腊、波斯、罗马","阿拉伯、蒙古、奥斯曼","拜占庭、十字军、土耳其"],a:0,exp:"伊斯坦布尔（古称君士坦丁堡）曾是罗马帝国、拜占庭帝国和奥斯曼帝国的首都，是唯一横跨欧亚大陆的城市。"}
+],
+"新加坡":[
+{q:"鱼尾狮是新加坡的象征，它的身体是什么组合？",options:["鱼头狮身","狮头鱼尾","龙头鱼身","鹰头狮身"],a:1,exp:"鱼尾狮是狮头鱼身的虚构动物，象征新加坡（Singapura在梵语中意为'狮城'）的渔村起源，1972年建成。"},
+{q:"滨海湾金沙酒店顶部的空中花园像什么？",options:["船","飞机","莲花","贝壳"],a:0,exp:"滨海湾金沙顶部有一个形如船舰的空中花园，长340米，设有无边泳池和观景台，2010年开业。"},
+{q:"新加坡的国土面积约为多少平方公里？",options:["约500","约728","约1000","约2000"],a:1,exp:"新加坡国土面积约728平方公里（通过填海不断扩大），是世界上面积最小的国家之一，1965年独立。"},
+{q:"新加坡的官方语言有几种？",options:["2种","3种","4种","5种"],a:2,exp:"新加坡有四种官方语言：英语、华语、马来语和泰米尔语，其中马来语为国语，英语为行政语言。"},
+{q:"新加坡植物园哪部分被列入世界遗产？",options:["整个植物园","国家兰花园","雨林区","植物园的历史核心区"],a:3,exp:"新加坡植物园的历史核心区于2015年列入世界遗产，是热带地区首个列入世界遗产的植物园，建于1859年。"}
+],
+"温哥华":[
+{q:"斯坦利公园的面积约为多少公顷？",options:["200","405","600","800"],a:1,exp:"斯坦利公园面积约405公顷，比纽约中央公园还大，是温哥华最著名的城市公园，1888年开放。"},
+{q:"温哥华位于加拿大的哪个省份？",options:["安大略省","魁北克省","不列颠哥伦比亚省","艾伯塔省"],a:2,exp:"温哥华位于不列颠哥伦比亚省（BC省），是加拿大第三大城市和西部最大城市，1886年建市。"},
+{q:"卡皮拉诺吊桥公园的主桥长度约为多少米？",options:["50米","100米","137米","200米"],a:2,exp:"卡皮拉诺吊桥长137米，高出河谷70米，建于1889年，是温哥华最受欢迎的旅游景点之一。"},
+{q:"温哥华是2010年冬奥会的什么城市？",options:["申办城市","主办城市","协办城市","候选城市"],a:1,exp:"温哥华是2010年冬季奥运会的主办城市，惠斯勒则承办了滑雪项目，这是冬奥会第三次在加拿大举办。"},
+{q:"格兰维尔岛以什么闻名？",options:["高科技产业","公共市场和艺术区","金融中心","体育场馆"],a:1,exp:"格兰维尔岛是温哥华的艺术和文化中心，拥有著名的公共市场、画廊和剧院，每年吸引千万游客。"}
+],
+"孟买":[
+{q:"印度门（Gateway of India）建于哪一年？",options:["1905年","1911年","1924年","1930年"],a:2,exp:"印度门建于1924年，是为纪念英国国王乔治五世和玛丽王后访印而建的拱门，高26米。"},
+{q:"宝莱坞（Bollywood）位于孟买的哪个郊区？",options:["班德拉","朱胡","安泰里","以上皆是"],a:3,exp:"宝莱坞电影工业主要分布在孟买的班德拉、朱胡和安泰里等西部地区，年产电影超过1500部。"},
+{q:"达巴瓦拉（Dabbawala）是孟买的什么服务？",options:["出租车服务","外卖送餐服务","快递服务","导游服务"],a:1,exp:"达巴瓦拉是孟买独特的午餐盒配送服务，每天从家中取餐送到办公室，错误率极低，约1600万分之1。"},
+{q:"维多利亚终点站（CST）是什么风格的建筑？",options:["印度-撒拉逊风格","哥特复兴式","新古典主义","装饰艺术风格"],a:1,exp:"维多利亚终点站（现名贾特拉帕蒂·希瓦吉终点站）是哥特复兴式建筑，2004年列入世界遗产，1888年建成。"},
+{q:"孟买是印度第几大城市？",options:["第一","第二","第三","第四"],a:0,exp:"孟买是印度人口最多的城市（约2000万），也是印度的金融和娱乐中心，1995年前称Bombay。"}
+],
+"雅典":[
+{q:"帕特农神庙供奉的是哪位女神？",options:["赫拉","雅典娜","阿佛洛狄忒","阿尔忒弥斯"],a:1,exp:"帕特农神庙建于公元前5世纪，供奉雅典娜女神，是古希腊建筑的巅峰之作，用白色大理石建造。"},
+{q:"雅典卫城建于什么时期？",options:["米诺斯文明","迈锡尼文明","古典时期","希腊化时期"],a:2,exp:"雅典卫城主要建筑建于公元前5世纪古典时期，是民主雅典黄金时代的象征，包括帕特农神庙等建筑。"},
+{q:"第一届现代奥运会于哪年在雅典举行？",options:["1892年","1896年","1900年","1904年"],a:1,exp:"第一届现代奥运会于1896年在雅典举行，这是自古代奥运会停办1500年后的首次复兴，有14个国家参加。"},
+{q:"卫城博物馆最著名的展品是什么？",options:["胜利女神像","厄瑞克忒翁神庙女像柱","掷铁饼者","维纳斯雕像"],a:1,exp:"卫城博物馆收藏了厄瑞克忒翁神庙的五座女像柱（Caryatids），第六座仍在大英博物馆，2009年新馆开放。"},
+{q:"雅典是以哪位神话人物命名的？",options:["阿波罗","波塞冬","雅典娜","宙斯"],a:2,exp:"据希腊神话，雅典娜和波塞冬争夺雅典守护权，雅典娜赠橄榄树获胜，城市因此得名，橄榄树也成为雅典的象征。"}
+],
+"阿姆斯特丹":[
+{q:"阿姆斯特丹的运河带被列入什么遗产？",options:["世界自然遗产","世界文化遗产","世界记忆遗产","非物质文化遗产"],a:1,exp:"阿姆斯特丹17世纪运河带于2010年列入世界文化遗产，包括三条主要运河和多条支流，总长超过100公里。"},
+{q:"梵高博物馆收藏了梵高多少幅作品？",options:["约50幅","约100幅","约200幅","约400幅"],a:2,exp:"梵高博物馆拥有约200幅油画、500幅素描和700多封信件，是世界上最大的梵高作品收藏，1973年开馆。"},
+{q:"阿姆斯特丹为什么被称为'北方威尼斯'？",options:["有很多桥梁","有很多运河","有很多岛屿","以上皆是"],a:1,exp:"阿姆斯特丹拥有超过100公里运河、1500座桥梁和90座岛屿，因此被称为'北方威尼斯'，建于12世纪。"},
+{q:"安妮·弗兰克故居位于阿姆斯特丹的哪里？",options:["市中心","王子运河","约丹区","博物馆区"],a:1,exp:"安妮·弗兰克故居位于王子运河263号，是二战期间安妮一家藏匿的地方，现为博物馆，1947年《安妮日记》出版。"},
+{q:"荷兰国立博物馆最著名的画作是什么？",options:["《戴珍珠耳环的少女》","《夜巡》","《向日葵》","《呐喊》"],a:1,exp:"伦勃朗的《夜巡》是荷兰国立博物馆的镇馆之宝，创作于1642年，是巴洛克艺术的杰作，画中人像真人大小。"}
+],
+"维也纳":[
+{q:"维也纳金色大厅以什么闻名？",options:["歌剧表演","新年音乐会","芭蕾舞","话剧"],a:1,exp:"维也纳金色大厅（Musikverein）以每年元旦举行的新年音乐会闻名全球，由维也纳爱乐乐团演奏，1870年建成。"},
+{q:"美泉宫有多少个房间？",options:["约500间","约1000间","约1441间","约2000间"],a:2,exp:"美泉宫共有1441个房间，是奥地利最大的宫殿，曾是哈布斯堡王朝的夏宫，1996年列入世界遗产。"},
+{q:"维也纳咖啡文化被列入什么遗产？",options:["世界文化遗产","世界记忆遗产","人类非物质文化遗产","世界自然遗产"],a:2,exp:"维也纳咖啡馆文化于2011年列入联合国非物质文化遗产，代表了一种独特的社交文化，维也纳有约2000家咖啡馆。"},
+{q:"弗洛伊德在维也纳的故居现为什么？",options:["餐厅","博物馆","酒店","学校"],a:1,exp:"弗洛伊德故居位于伯格街19号，现为弗洛伊德博物馆，展示了他的生活和工作环境，1938年弗洛伊德被迫离开维也纳。"},
+{q:"维也纳森林位于城市的哪个方向？",options:["东","西","南","北"],a:1,exp:"维也纳森林位于城市西侧，是阿尔卑斯山余脉，也是著名的葡萄酒产区，小约翰·施特劳斯曾创作《维也纳森林的故事》。"}
+],
+"开普敦":[
+{q:"桌山得名的原因是什么？",options:["山顶有桌子","山顶平坦如桌","山形似桌子腿","山上有餐厅"],a:1,exp:"桌山山顶平坦如桌面，长约3公里，经常覆盖着被称为'桌布'的云层，是开普敦的标志，2011年列入新世界七大自然奇观。"},
+{q:"好望角最初被命名为什么？",options:["风暴角","希望角","海角","非洲角"],a:0,exp:"好望角最初被葡萄牙航海家迪亚士命名为'风暴角'，后由约翰二世改名为'好望角'，1488年被发现。"},
+{q:"罗本岛因什么而闻名？",options:["自然风光","关押曼德拉","野生动物","古代遗迹"],a:1,exp:"罗本岛曾关押纳尔逊·曼德拉18年，1999年列入世界文化遗产，现为博物馆，曼德拉于1990年获释。"},
+{q:"开普敦是南非的第几大城市？",options:["第一","第二","第三","第四"],a:1,exp:"开普敦是南非第二大城市（仅次于约翰内斯堡），但它是南非的立法首都，1652年荷兰东印度公司在此建立补给站。"},
+{q:"维多利亚港建于哪一年？",options:["1860年","1880年","1900年","1920年"],a:0,exp:"维多利亚港（现名维多利亚和阿尔弗雷德滨海区）建于1860年，是开普敦最热闹的购物娱乐区，以维多利亚女王和阿尔弗雷德亲王命名。"}
+],
+"墨西哥城":[
+{q:"太阳金字塔位于墨西哥城附近的哪个遗址？",options:["奇琴伊察","特奥蒂瓦坎","图拉","帕伦克"],a:1,exp:"太阳金字塔位于特奥蒂瓦坎遗址，高约65米，是中美洲最大的金字塔之一，建于公元100年左右。"},
+{q:"墨西哥城建立在哪个古代城市的遗址上？",options:["玛雅城","特诺奇蒂特兰","托尔特克","奥尔梅克"],a:1,exp:"墨西哥城建于阿兹特克首都特诺奇蒂特兰的遗址上，该城于1325年建在特斯科科湖中的岛上，1521年被西班牙人征服。"},
+{q:"弗里达·卡罗博物馆又称什么？",options:["红房子","蓝房子","绿房子","黄房子"],a:1,exp:"弗里达·卡罗博物馆位于科约阿坎区，因其蓝色外墙而被称为'蓝房子'(Casa Azul)，1958年开放。"},
+{q:"墨西哥城大都会大教堂建于什么时期？",options:["16-17世纪","17-19世纪","15-16世纪","19-20世纪"],a:1,exp:"墨西哥城大都会大教堂建于1573年至1813年间，是拉丁美洲最大和最古老的主教座堂，建在阿兹特克神庙遗址上。"},
+{q:"墨西哥城海拔约为多少米？",options:["1500米","2240米","3000米","1000米"],a:1,exp:"墨西哥城海拔约2240米，是世界上海拔最高的特大城市，因此一些人初到会有高原反应，建于湖床上。"}
+],
+"威尼斯":[
+{q:"威尼斯由多少个小岛组成？",options:["约50个","约118个","约200个","约300个"],a:1,exp:"威尼斯由118个小岛组成，通过约400座桥梁连接，运河总长约28公里，建在亚得里亚海潟湖的118个岛屿上。"},
+{q:"圣马可广场被拿破仑称为什么？",options:["世界最美的广场","欧洲最美的客厅","意大利的心脏","威尼斯的明珠"],a:1,exp:"拿破仑曾称圣马可广场为'欧洲最美的客厅'，广场周围有圣马可大教堂、钟楼和总督宫，建于9世纪。"},
+{q:"威尼斯电影节创办于哪一年？",options:["1930年","1932年","1945年","1950年"],a:1,exp:"威尼斯电影节创办于1932年，是世界上第一个国际电影节，金狮奖是其最高奖项，每年8-9月在利多岛举行。"},
+{q:"叹息桥连接哪两座建筑？",options:["两座宫殿","宫殿和监狱","教堂和宫殿","两座教堂"],a:1,exp:"叹息桥连接总督宫和监狱，传说囚犯过桥时叹息而得名，是威尼斯最著名的桥梁之一，建于1600年。"},
+{q:"威尼斯传统划船比赛叫什么？",options:["贡多拉赛","雷戈塔","划船节","水上马拉松"],a:1,exp:"雷戈塔(Regata)是威尼斯传统的划船比赛，每年9月举行，历史可追溯至14世纪，是威尼斯最重要的传统节日之一。"}
+],
+"旧金山":[
+{q:"金门大桥的颜色是什么？",options:["金色","红色（国际橙）","银色","绿色"],a:1,exp:"金门大桥的颜色是'国际橙'，这种颜色既与周围环境协调，又能在雾中被看到，1937年通车，主跨1280米。"},
+{q:"恶魔岛（Alcatraz）最初是什么设施？",options:["军事要塞","灯塔","监狱","以上皆是"],a:3,exp:"恶魔岛最初是军事要塞和灯塔，1934-1963年间是联邦监狱，关押过阿尔·卡彭等著名罪犯，1969年曾被印第安人占领。"},
+{q:"旧金山缆车系统建于哪一年？",options:["1869年","1873年","1880年","1890年"],a:1,exp:"旧金山缆车系统由安德鲁·哈利迪于1873年发明，是世界上最后一条手动操作的缆车系统，现存3条线路。"},
+{q:"渔人码头最著名的海狮聚集地是几号码头？",options:["33号码头","39号码头","41号码头","43号码头"],a:1,exp:"39号码头自1989年起成为海狮的聚集地，最多时曾有超过300头海狮在此栖息，是旧金山最受欢迎的旅游景点之一。"},
+{q:"硅谷位于旧金山的哪个方向？",options:["北部","南部","东部","西部"],a:1,exp:"硅谷位于旧金山湾区南部，从帕洛阿尔托延伸到圣何塞，是全球高科技产业的中心，得名于半导体芯片的材料硅。"}
+]
+};
+
+const CHINA_QUESTIONS = {
+"北京":[
+{q:"故宫始建于哪个朝代？",options:["元朝","明朝","清朝","宋朝"],a:1,exp:"故宫始建于明朝永乐四年（1406年），永乐十八年（1420年）建成，是明清两代的皇家宫殿，占地72万平方米。"},
+{q:"天坛的主要功能是什么？",options:["皇帝登基","祭天祈谷","皇家宴会","处理朝政"],a:1,exp:"天坛是明清两代皇帝祭天、祈谷的场所，主要建筑有圜丘坛、皇穹宇和祈年殿，建于1420年，占地273公顷。"},
+{q:"北京中轴线全长约多少公里？",options:["约5公里","约7.8公里","约10公里","约15公里"],a:1,exp:"北京中轴线南起永定门，北至钟鼓楼，全长约7.8公里，是世界上现存最长的城市轴线，2024年列入世界遗产。"},
+{q:"八达岭长城建于什么时期？",options:["秦朝","汉朝","明朝","清朝"],a:2,exp:"八达岭长城是明长城的重要组成部分，建于明朝弘治十八年（1505年），是居庸关的前哨，1957年开放旅游。"},
+{q:"颐和园的前身是什么？",options:["圆明园","清漪园","畅春园","静明园"],a:1,exp:"颐和园前身为清漪园，建于乾隆十五年（1750年），光绪十四年（1888年）重建并改名为颐和园，占地290公顷。"}
+],
+"西安":[
+{q:"兵马俑是哪位皇帝的陪葬品？",options:["汉武帝","秦始皇","唐太宗","隋文帝"],a:1,exp:"兵马俑是秦始皇陵的陪葬坑，1974年被发现，被誉为'世界第八大奇迹'，出土陶俑约8000件，战车百乘。"},
+{q:"西安城墙是中国现存规模最大的什么城墙？",options:["土城墙","砖城墙","古城墙","以上皆是"],a:2,exp:"西安城墙是中国现存规模最大、保存最完整的古代城垣，建于明洪武年间（1370-1378年），周长13.74公里。"},
+{q:"大雁塔是为保存什么而建的？",options:["道教典籍","佛教经卷","儒家经典","历史文献"],a:1,exp:"大雁塔建于唐永徽三年（652年），玄奘为保存由天竺经丝绸之路带回长安的经卷佛像而主持修建，高64.5米。"},
+{q:"华清池与哪位历史人物的爱情故事有关？",options:["汉武帝与李夫人","唐玄宗与杨贵妃","唐太宗与长孙皇后","宋徽宗与李师师"],a:1,exp:"华清池因唐玄宗与杨贵妃的爱情故事而闻名，白居易《长恨歌》中'春寒赐浴华清池'即指此处，建于唐初。"},
+{q:"西安碑林收藏石碑最多的专题是什么？",options:["佛教造像","书法名碑","历史纪事","墓志铭"],a:1,exp:"西安碑林收藏了自汉至清的碑石4000余方，以书法名碑最为著名，包括颜真卿、柳公权等名家碑刻，1944年建馆。"}
+],
+"上海":[
+{q:"外滩的建筑群主要建于什么时期？",options:["清朝","民国时期","新中国成立后","改革开放后"],a:1,exp:"外滩建筑群主要建于20世纪初（1900-1930年代），融合了哥特式、巴洛克式、罗马式等多种风格，被称为'万国建筑博览群'。"},
+{q:"东方明珠广播电视塔高约多少米？",options:["350米","468米","500米","600米"],a:1,exp:"东方明珠塔高约468米，1994年建成，曾是亚洲第一高塔，现为上海标志性文化景观之一，有11个球体。"},
+{q:"豫园建于哪个朝代？",options:["元朝","明朝","清朝","宋朝"],a:1,exp:"豫园始建于明朝嘉靖三十八年（1559年），由四川布政使潘允端为父亲安度晚年而建造，占地30余亩。"},
+{q:"上海世博会于哪一年举办？",options:["2008年","2010年","2012年","2015年"],a:1,exp:"中国2010年上海世界博览会于5月1日至10月31日举行，主题为'城市，让生活更美好'，参观人数超7300万。"},
+{q:"石库门是上海特有的什么建筑？",options:["庙宇","民居","商店","剧院"],a:1,exp:"石库门是上海特有的民居建筑，起源于太平天国时期，融合了江南民居和英国排屋的特点，是海派文化的象征。"}
+],
+"成都":[
+{q:"都江堰水利工程由谁主持修建？",options:["李冰父子","诸葛亮","郑国","史禄"],a:0,exp:"都江堰由秦国蜀郡太守李冰及其子于公元前256年左右主持修建，至今仍在使用，使成都平原成为'天府之国'。"},
+{q:"武侯祠是纪念谁的祠堂？",options:["刘备","诸葛亮","关羽","张飞"],a:1,exp:"武侯祠始建于公元223年，是纪念三国时期蜀汉丞相诸葛亮的祠堂，也是中国唯一的君臣合祀祠庙，占地15万平方米。"},
+{q:"大熊猫繁育研究基地位于成都哪个区？",options:["锦江区","武侯区","成华区","金牛区"],a:2,exp:"成都大熊猫繁育研究基地位于成华区熊猫大道，是世界著名的大熊猫迁地保护基地和科研繁育中心，1987年建立。"},
+{q:"川剧变脸属于什么非遗类别？",options:["传统音乐","传统戏剧","传统舞蹈","曲艺"],a:1,exp:"川剧变脸是川剧表演的特技之一，2006年川剧被列入第一批国家级非物质文化遗产名录，变脸可在瞬间完成。"},
+{q:"金沙遗址出土了什么著名文物？",options:["兵马俑","太阳神鸟金饰","司母戊鼎","曾侯乙编钟"],a:1,exp:"太阳神鸟金饰出土于金沙遗址，厚仅0.02厘米，是中国文化遗产标志的原型，2001年发现，距今约3000年。"}
+],
+"杭州":[
+{q:"西湖被列入世界遗产的类型是什么？",options:["自然遗产","文化遗产","双重遗产","文化景观"],a:3,exp:"杭州西湖文化景观于2011年列入世界遗产，是中国首个以文化景观类型列入世界遗产的湖泊，'西湖十景'闻名中外。"},
+{q:"雷峰塔最初建于哪个朝代？",options:["唐朝","北宋","南宋","明朝"],a:1,exp:"雷峰塔建于北宋太平兴国二年（977年），是吴越国王钱俶为供奉佛螺髻发舍利而建，1924年倒塌，2002年重建。"},
+{q:"京杭大运河开凿于哪个朝代？",options:["秦朝","隋朝","唐朝","元朝"],a:1,exp:"京杭大运河始建于春秋时期，隋朝大运河以洛阳为中心，元朝裁弯取直形成今天的走向，全长1794公里。"},
+{q:"灵隐寺创建于哪一年？",options:["公元326年","公元500年","公元618年","公元960年"],a:0,exp:"灵隐寺始建于东晋咸和元年（326年），由印度僧人慧理创建，是杭州最早的名刹，占地约87000平方米。"},
+{q:"龙井茶属于什么茶类？",options:["红茶","绿茶","乌龙茶","白茶"],a:1,exp:"龙井茶是中国十大名茶之一，属于绿茶类，产于杭州西湖龙井村一带，以'色绿、香郁、味甘、形美'著称。"}
+],
+"拉萨":[
+{q:"布达拉宫始建于哪个世纪？",options:["6世纪","7世纪","8世纪","9世纪"],a:1,exp:"布达拉宫始建于7世纪吐蕃赞普松赞干布时期，17世纪五世达赖喇嘛时期重建，成为历代达赖喇嘛的冬宫，高117米。"},
+{q:"大昭寺供奉的释迦牟尼像是哪位公主带入西藏的？",options:["文成公主","金城公主","尺尊公主","弘化公主"],a:0,exp:"大昭寺供奉的释迦牟尼12岁等身像是唐太宗赐给文成公主的嫁妆，由文成公主带入西藏，建于647年。"},
+{q:"八廓街是什么类型的街道？",options:["商业街","转经道","美食街","以上皆是"],a:3,exp:"八廓街是拉萨著名的转经道和商业中心，藏族人称为'圣路'，围绕大昭寺形成环形街道，距今已有1300多年历史。"},
+{q:"纳木错湖海拔约为多少米？",options:["约3000米","约4718米","约5000米","约4000米"],a:1,exp:"纳木错湖面海拔4718米，是世界上海拔最高的大型湖泊，也是西藏第二大湖泊，面积1920平方公里。"},
+{q:"罗布林卡是什么类型的园林？",options:["皇家园林","寺庙园林","私家园林","公共园林"],a:0,exp:"罗布林卡始建于18世纪，是历代达赖喇嘛的夏宫，被称为'拉萨的颐和园'，2001年列入世界遗产，占地36万平方米。"}
+],
+"桂林":[
+{q:"桂林山水属于什么地貌？",options:["丹霞地貌","喀斯特地貌","雅丹地貌","冰川地貌"],a:1,exp:"桂林山水属于喀斯特地貌（岩溶地貌），由石灰岩经亿万年溶蚀形成，以山青、水秀、洞奇、石美闻名，2014年列入世界遗产。"},
+{q:"漓江发源于哪里？",options:["贵州","广西猫儿山","湖南","云南"],a:1,exp:"漓江发源于广西兴安县猫儿山，流经桂林、阳朔，全长164公里，是桂林山水的灵魂，'桂林山水甲天下'即指漓江。"},
+{q:"象鼻山因何得名？",options:["山形似象鼻","山上有大象","传说有大象","岩石颜色像象"],a:0,exp:"象鼻山因山形酷似一头巨象临江汲水而得名，是桂林山水的象征，也是桂林的城徽，位于漓江与桃花江交汇处。"},
+{q:"阳朔西街以什么闻名？",options:["古建筑","酒吧和异域风情","传统手工艺","美食小吃"],a:1,exp:"阳朔西街有1400多年历史，现以酒吧、咖啡馆和异域风情闻名，被称为'洋人街'，是阳朔最繁华的街道。"},
+{q:"龙脊梯田主要是什么民族的杰作？",options:["苗族","瑶族","壮族","以上皆是"],a:3,exp:"龙脊梯田是壮族、瑶族等少数民族的杰作，始建于元朝，完工于清初，有'梯田世界之冠'的美誉，最高海拔1100米。"}
+],
+"南京":[
+{q:"中山陵是为纪念谁而修建的？",options:["蒋介石","孙中山","朱元璋","洪秀全"],a:1,exp:"中山陵是伟大的民主革命先行者孙中山先生的陵寝，始建于1926年，1929年建成，占地8万余平方米，392级台阶。"},
+{q:"明孝陵是哪位皇帝的陵墓？",options:["朱棣","朱元璋","朱允炆","朱厚照"],a:1,exp:"明孝陵是明朝开国皇帝朱元璋和皇后马氏的合葬陵墓，2003年列入世界文化遗产，始建于1381年，占地170万平方米。"},
+{q:"夫子庙供奉的是谁？",options:["老子","孔子","孟子","荀子"],a:1,exp:"夫子庙即孔庙，供奉孔子，位于秦淮河北岸，是中国四大文庙之一，也是南京著名的文化商业区，建于1034年。"},
+{q:"南京大屠杀发生于哪一年？",options:["1935年","1937年","1939年","1941年"],a:1,exp:"南京大屠杀发生于1937年12月13日开始的六周内，超过30万中国平民和战俘被日军杀害，2014年设立国家公祭日。"},
+{q:"南京长江大桥是中国自行设计建造的第几座长江大桥？",options:["第一座","第二座","第三座","第四座"],a:0,exp:"南京长江大桥于1968年建成通车，是中国自行设计建造的第一座双层铁路公路两用桥，铁路桥长6772米，公路桥长4589米。"}
+],
+"厦门":[
+{q:"鼓浪屿因什么被列入世界遗产？",options:["自然风光","历史国际社区","建筑艺术","音乐文化"],a:1,exp:"鼓浪屿于2017年以'历史国际社区'列入世界遗产，展现了中西文化交融的历史风貌，有'万国建筑博览'之称。"},
+{q:"南普陀寺位于厦门的哪座山下？",options:["鼓浪屿","五老峰","日光岩","云顶山"],a:1,exp:"南普陀寺位于五老峰下，始建于唐代，是闽南佛教胜地之一，与厦门大学相邻，占地25.8万平方米。"},
+{q:"厦门大学由谁创办？",options:["蔡元培","陈嘉庚","张伯苓","梅贻琦"],a:1,exp:"厦门大学由爱国华侨领袖陈嘉庚于1921年创办，是中国近代教育史上第一所华侨创办的大学，被誉为'中国最美大学'。"},
+{q:"厦门环岛路全长约多少公里？",options:["约20公里","约31公里","约50公里","约10公里"],a:1,exp:"厦门环岛路全长约31公里，是厦门国际马拉松比赛的主赛道，被誉为世界最美的马拉松赛道之一，1997年建成。"},
+{q:"土笋冻是厦门的什么特色小吃？",options:["竹笋制品","海鲜制品","豆制品","米制品"],a:1,exp:"土笋冻是闽南传统小吃，原料是一种名为'土笋'（可口革囊星虫）的海虫，经熬煮后凝结成冻，口感Q弹。"}
+],
+"重庆":[
+{q:"洪崖洞的建筑风格属于什么？",options:["徽派建筑","吊脚楼","四合院","窑洞"],a:1,exp:"洪崖洞以巴渝传统建筑吊脚楼为主体，依山就势，沿江而建，是重庆最具特色的景观之一，2006年建成。"},
+{q:"长江三峡由哪三个峡组成？",options:["瞿塘峡、巫峡、西陵峡","虎跳峡、巫峡、西陵峡","瞿塘峡、虎跳峡、西陵峡","瞿塘峡、巫峡、虎跳峡"],a:0,exp:"长江三峡西起重庆奉节白帝城，东至湖北宜昌南津关，由瞿塘峡、巫峡、西陵峡组成，全长193公里。"},
+{q:"重庆为什么被称为'山城'？",options:["山多","城市依山而建","海拔高","以上皆是"],a:3,exp:"重庆地处四川盆地东部，城市依山而建，道路高低起伏，建筑错落有致，因此被称为'山城'，也是'雾都'和'桥都'。"},
+{q:"大足石刻以什么宗教题材为主？",options:["道教","佛教","儒教","三教合一"],a:3,exp:"大足石刻以佛教题材为主，兼有道教和儒家内容，1999年列入世界文化遗产，始建于唐末宋初，5万余尊造像。"},
+{q:"重庆火锅起源于什么行业？",options:["餐饮业","船工和纤夫","军队","宫廷"],a:1,exp:"重庆火锅起源于长江边的船工和纤夫，他们用牛下水和辣椒、花椒在江边煮食，逐渐演变成今天的火锅，有'中国火锅之都'之称。"}
+],
+"敦煌":[
+{q:"莫高窟开凿于哪个世纪？",options:["3世纪","4世纪","5世纪","6世纪"],a:1,exp:"莫高窟始建于前秦时期（公元366年），历经十六国、北朝、隋、唐、五代、西夏、元等朝代兴建，有735个洞窟。"},
+{q:"敦煌壁画中最著名的飞天形象来源于什么宗教？",options:["道教","佛教","儒教","伊斯兰教"],a:1,exp:"飞天是敦煌壁画中佛教艺术的代表形象，源自印度，经西域传入中国，融合了中原文化特色，莫高窟有4500余身飞天。"},
+{q:"鸣沙山月牙泉的泉水形状像什么？",options:["圆形","月牙形","方形","三角形"],a:1,exp:"月牙泉因水面酷似一弯新月而得名，位于鸣沙山环抱之中，千百年来不为流沙掩埋，被誉为'沙漠第一泉'。"},
+{q:"阳关和玉门关是古丝绸之路上的什么？",options:["城市","关隘","驿站","寺庙"],a:1,exp:"阳关和玉门关是汉代河西走廊西端的重要关隘，是古丝绸之路南路和北路的必经之地，'西出阳关无故人'即指此处。"},
+{q:"《敦煌曲谱》是什么类型的文献？",options:["乐谱","诗集","历史书","医书"],a:0,exp:"《敦煌曲谱》是五代后唐时期抄写的琵琶曲谱，是中国现存最早的乐谱之一，现藏法国国家图书馆，1908年被盗。"}
+],
+"苏州":[
+{q:"苏州园林被列入世界遗产的数量是多少？",options:["4座","6座","9座","12座"],a:2,exp:"苏州园林中拙政园、留园、网师园、环秀山庄、沧浪亭、狮子林、艺圃、耦园、退思园共9座列入世界遗产，始于1997年。"},
+{q:"拙政园的名字来源于哪篇古文？",options:["《桃花源记》","《闲居赋》","《兰亭集序》","《岳阳楼记》"],a:1,exp:"拙政园名取西晋潘岳《闲居赋》'灌园鬻蔬，以供朝夕之膳……此亦拙者之为政也'之意，建于1509年。"},
+{q:"苏州刺绣属于中国四大名绣之一，其特色是什么？",options:["色彩浓艳","图案写实","精细雅洁","针法粗犷"],a:2,exp:"苏绣以'精细雅洁'著称，图案秀丽、构思巧妙、绣工细致、针法活泼、色彩清雅，代表作有双面绣《猫》。"},
+{q:"虎丘塔为什么被称为'东方比萨斜塔'？",options:["建筑风格相似","塔身倾斜","历史悠久","以上皆是"],a:1,exp:"虎丘塔（云岩寺塔）建于五代后周，塔身倾斜约3.59度，因此被称为'东方比萨斜塔'，高47米，建于959年。"},
+{q:"平江路是苏州什么类型的街区？",options:["商业步行街","历史文化街区","美食街","以上皆是"],a:3,exp:"平江路是苏州古城保存最完整的历史文化街区，沿河而建，保留了唐宋以来的城坊格局，全长1606米。"}
+],
+"丽江":[
+{q:"丽江古城被列入世界遗产的类型是什么？",options:["自然遗产","文化遗产","双重遗产","文化景观"],a:1,exp:"丽江古城于1997年列入世界文化遗产，是中国少数民族古城中唯一列入世界遗产的城市，纳西族聚居地。"},
+{q:"玉龙雪山最高峰海拔约为多少米？",options:["约4500米","约5596米","约6000米","约5000米"],a:1,exp:"玉龙雪山最高峰扇子陡海拔5596米，是北半球纬度最低、海拔最高的雪山，至今无人登顶，有'现代冰川博物馆'之称。"},
+{q:"纳西族的传统文字叫什么？",options:["彝文","东巴文","藏文","傣文"],a:1,exp:"东巴文是纳西族使用的图画象形文字，是目前世界上唯一还在使用的象形文字系统，2003年列入世界记忆遗产。"},
+{q:"泸沽湖主要居住的是什么民族？",options:["藏族","纳西族（摩梭人）","白族","彝族"],a:1,exp:"泸沽湖主要居住着纳西族支系摩梭人，至今仍保留着母系氏族社会的'走婚'习俗，被称为'东方女儿国'。"},
+{q:"丽江古城的水系来源于什么？",options:["地下水","黑龙潭","雨水","河流"],a:1,exp:"丽江古城水系来源于黑龙潭，三股水分流穿城而过，形成'家家门前绕水流，户户屋后垂杨柳'的景象。"}
+],
+"哈尔滨":[
+{q:"圣索菲亚教堂是什么风格的建筑？",options:["哥特式","拜占庭式","巴洛克式","罗马式"],a:1,exp:"圣索菲亚教堂是典型的拜占庭式建筑，建于1907年，是哈尔滨的标志性建筑，现为建筑艺术博物馆，高53.35米。"},
+{q:"哈尔滨冰雪大世界通常在几月举办？",options:["一月","十二月至次年二月","十一月","三月"],a:1,exp:"哈尔滨冰雪大世界通常在每年12月下旬至次年2月底举办，是世界上规模最大的冰雪主题乐园，始于1999年。"},
+{q:"中央大街的面包石路面铺设于哪一年？",options:["1898年","1924年","1950年","1900年"],a:1,exp:"中央大街面包石路面铺设于1924年，每块石头长18厘米、宽10厘米，当时一块银元只能买一块石头，全长1450米。"},
+{q:"哈尔滨为什么被称为'东方什么城市'？",options:["东方威尼斯","东方莫斯科","东方巴黎","东方伦敦"],a:1,exp:"哈尔滨因城市建筑和文化的俄罗斯风情而被称为'东方莫斯科'和'东方小巴黎'，20世纪初有20多个国家在此设领事馆。"},
+{q:"松花江流经哈尔滨的哪个方向？",options:["东","西","南","北"],a:1,exp:"松花江自西向东流经哈尔滨市区北部，是黑龙江在中国境内的最大支流，冬季结冰后可进行冰上活动，长1927公里。"}
+],
+"张家界":[
+{q:"张家界国家森林公园是中国第几个国家森林公园？",options:["第一个","第二个","第三个","第四个"],a:0,exp:"张家界国家森林公园成立于1982年，是中国第一个国家森林公园，以石英砂岩峰林地貌闻名，占地4810公顷。"},
+{q:"电影《阿凡达》中的悬浮山灵感来源于张家界的什么景观？",options:["天子山","袁家界乾坤柱","黄石寨","金鞭溪"],a:1,exp:"《阿凡达》中哈利路亚山的原型是张家界袁家界的'南天一柱'（后更名为'哈利路亚山'），高1074米。"},
+{q:"天门山的天然天门洞高约多少米？",options:["约100米","约131.5米","约200米","约50米"],a:1,exp:"天门洞高131.5米，宽57米，深60米，是世界上海拔最高的天然穿山溶洞，2006年俄罗斯战机穿越天门洞。"},
+{q:"百龙天梯是世界上什么类型的最高电梯？",options:["室内电梯","户外电梯","观光电梯","以上皆是"],a:2,exp:"百龙天梯垂直高差335米，运行高度326米，是世界上最高、运行速度最快、载重量最大的户外观光电梯，2002年建成。"},
+{q:"张家界地貌属于什么类型？",options:["丹霞地貌","喀斯特地貌","石英砂岩峰林地貌","雅丹地貌"],a:2,exp:"张家界地貌是中国地质学家定义的新类型——石英砂岩峰林地貌，2010年被列入世界自然遗产，有3000余座石峰。"}
+],
+"青岛":[
+{q:"青岛啤酒创立于哪一年？",options:["1898年","1903年","1910年","1920年"],a:1,exp:"青岛啤酒创立于1903年，由英德商人合资创办，是中国历史最悠久的啤酒品牌之一，1906年获慕尼黑博览会金奖。"},
+{q:"栈桥是青岛的标志性建筑，它建于什么时期？",options:["德国占领时期","清朝","民国时期","新中国成立后"],a:0,exp:"栈桥建于1892年（清光绪十八年），是青岛最早的军事专用人工码头，后成为青岛的象征，长440米。"},
+{q:"八大关因什么而得名？",options:["八座关隘","八条马路","八个景点","八座建筑"],a:1,exp:"八大关因这里有八条马路（现增至十条）以中国古代著名关隘命名，如嘉峪关、居庸关等，有'万国建筑博览会'之称。"},
+{q:"崂山是中国什么宗教的发源地之一？",options:["佛教","道教","儒教","伊斯兰教"],a:1,exp:"崂山是道教全真派的发源地之一，太清宫始建于西汉，是崂山历史最悠久的道观，有'海上第一名山'之称。"},
+{q:"青岛五四广场的名称来源于什么？",options:["五四运动","五四宪法","五四青年节","五四会议"],a:0,exp:"五四广场因纪念五四运动而得名，广场上的'五月的风'雕塑是青岛的地标，高30米，重500余吨。"}
+],
+"昆明":[
+{q:"滇池是云南省最大的什么？",options:["河流","湖泊","水库","湿地"],a:1,exp:"滇池是云南省最大的淡水湖，面积约330平方公里，有'高原明珠'之称，也是昆明市的母亲湖，海拔1886米。"},
+{q:"石林属于什么地貌？",options:["丹霞地貌","喀斯特地貌","雅丹地貌","冰川地貌"],a:1,exp:"石林是典型的喀斯特地貌，由石灰岩经溶蚀形成，2007年列入世界自然遗产，有'天下第一奇观'之称。"},
+{q:"云南民族村展示了多少个少数民族的文化？",options:["15个","25个","35个","56个"],a:1,exp:"云南民族村展示了云南25个少数民族的村寨建筑、生产生活和文化习俗，1992年建成，占地89公顷。"},
+{q:"昆明为什么被称为'春城'？",options:["春天最长","四季如春","花最多","以上皆是"],a:1,exp:"昆明地处低纬度高原，年平均气温约15℃，夏无酷暑、冬无严寒，因此被称为'春城'，鲜花常年开放。"},
+{q:"金马碧鸡坊是昆明的什么建筑？",options:["寺庙","牌坊","城楼","桥梁"],a:1,exp:"金马碧鸡坊是昆明的标志性牌坊，始建于明朝宣德年间，因东坊临金马山、西坊靠碧鸡山而得名，1999年重建。"}
+],
+"乌鲁木齐":[
+{q:"天山天池位于哪座山脉？",options:["昆仑山","天山","阿尔泰山","祁连山"],a:1,exp:"天山天池位于天山东段博格达峰北麓，海拔约1910米，是著名的高山湖泊，1982年列入国家重点风景名胜区。"},
+{q:"新疆国际大巴扎在维吾尔语中是什么意思？",options:["大市场","集市","商场","以上皆是"],a:3,exp:"大巴扎在维吾尔语中意为'大市场'或'集市'，新疆国际大巴扎是世界规模最大的大巴扎，2003年建成。"},
+{q:"坎儿井是新疆什么地区的灌溉系统？",options:["北疆","南疆","东疆","以上皆有"],a:3,exp:"坎儿井是新疆吐鲁番、哈密等干旱地区的地下灌溉系统，与长城、京杭大运河并称中国古代三大工程，总长5000余公里。"},
+{q:"维吾尔族传统音乐十二木卡姆被列入什么遗产？",options:["世界自然遗产","世界文化遗产","人类非物质文化遗产","世界记忆遗产"],a:2,exp:"十二木卡姆于2005年列入人类非物质文化遗产代表作名录，是维吾尔族传统音乐文化的集大成者，有340余首曲目。"},
+{q:"达坂城因什么歌曲而闻名？",options:["《达坂城的姑娘》","《新疆好》","《我们新疆好地方》","《草原之夜》"],a:0,exp:"《达坂城的姑娘》是王洛宾整理编曲的维吾尔族民歌，使达坂城成为闻名中外的旅游地，1938年创作。"}
+],
+"洛阳":[
+{q:"龙门石窟开凿于哪个朝代？",options:["西汉","北魏","唐朝","以上皆是"],a:3,exp:"龙门石窟始凿于北魏孝文帝时期（493年），盛于唐，延续至清，2000年列入世界文化遗产，有2345个窟龛。"},
+{q:"白马寺是中国第几座官办寺院？",options:["第一座","第二座","第三座","第四座"],a:0,exp:"白马寺建于东汉永平十一年（68年），是中国第一座官办寺院，被誉为中国佛教的'祖庭'和'释源'。"},
+{q:"洛阳牡丹花会通常在几月举行？",options:["三月","四月","五月","六月"],a:1,exp:"洛阳牡丹花会通常在每年4月举行，洛阳牡丹始于隋、盛于唐、甲天下于宋，有'洛阳牡丹甲天下'之说。"},
+{q:"洛阳是哪些朝代的都城？",options:["5个","8个","13个","20个"],a:2,exp:"洛阳是13个朝代的都城，包括夏、商、西周、东周、东汉、曹魏、西晋、北魏、隋、唐等，有'十三朝古都'之称。"},
+{q:"唐三彩主要产于哪里？",options:["西安","洛阳","开封","北京"],a:1,exp:"唐三彩主要产于洛阳和西安，是一种低温铅釉陶器，以黄、绿、白三色为主，盛行于唐代，多用于陪葬。"}
+],
+"武汉":[
+{q:"黄鹤楼位于武汉的哪座山上？",options:["蛇山","龟山","珞珈山","磨山"],a:0,exp:"黄鹤楼位于武汉市武昌区蛇山之巅，始建于三国时期，是'江南三大名楼'之一，享有'天下江山第一楼'的美誉。"},
+{q:"武汉长江大桥是哪一年通车的？",options:["1955年","1957年","1960年","1962年"],a:1,exp:"武汉长江大桥于1957年10月15日通车，是新中国成立后在长江上修建的第一座公铁两用桥，被称为'万里长江第一桥'。"},
+{q:"武汉三镇指的是哪三个地方？",options:["武昌、汉口、汉阳","武昌、汉口、江夏","汉阳、汉口、蔡甸","武昌、洪山、汉阳"],a:0,exp:"武汉三镇指武昌、汉口、汉阳，长江和汉江在此交汇，将武汉分为三部分，1927年合并为武汉市。"},
+{q:"东湖是中国最大的什么类型的湖泊？",options:["淡水湖","城中湖","人工湖","火山湖"],a:1,exp:"东湖是中国最大的城中湖，面积33平方公里，约为杭州西湖的6倍，位于武汉市武昌区东部。"},
+{q:"热干面是武汉的特色早餐，它的主要调料不包括什么？",options:["芝麻酱","辣椒油","酱油","番茄酱"],a:3,exp:"热干面是武汉最著名的特色小吃，主要调料有芝麻酱、辣椒油、酱油、醋、葱花等，不含番茄酱，与山西刀削面、两广伊府面、四川担担面、北方炸酱面并称为中国五大名面。"}
+],
+};
+
+const CHANCE_EVENTS = [
+{text:"🎁 幸运奖励：直接获得1个正确答案！",effect:"free_correct"},
+{text:"🌪️ 遭遇风暴：后退2格！",effect:"back",steps:2},
+{text:"✈️ 快速通道：前进3格！",effect:"forward",steps:3},
+{text:"📚 知识补给：额外获得1道题目机会！",effect:"bonus"},
+{text:"🛑 海关检查：暂停一回合！",effect:"skip_turn"},
+{text:"🎒 旅行疲劳：下次答题难度降低！",effect:"easy"},
+{text:"🗺️ 发现宝藏：再掷一次骰子！",effect:"roll_again"},
+{text:"⭐ 幸运星：答对数+1，继续冒险！",effect:"free_correct"}
+];
+
+// ==================== GAME STATE ====================
+let gameState = { mapType:'world', players:[], currentPlayer:0, board:[], gameOver:false, winner:null, usedQuestions:new Set() };
+let selectedMap = 'world', selectedCount = 2, selectedChars = [], charNames = {};
+let isRolling = false, currentQuiz = null, waitingForQuizClose = false;
+const WIN_SCORE = 10, SKIP_THRESHOLD = 3;
+
+// ==================== START SCREEN ====================
+function selectMap(map) {
+  selectedMap = map;
+  document.querySelectorAll('.map-card').forEach(c => c.classList.remove('selected'));
+  document.querySelector(`[data-map="${map}"]`).classList.add('selected');
+}
+function selectCount(count) {
+  selectedCount = count; selectedChars = []; charNames = {};
+  document.querySelectorAll('.count-btn').forEach((b,i) => b.classList.toggle('selected', i === count-1));
+  document.getElementById('selectedChars').textContent = '';
+  document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected','assigned'));
+}
+function selectChar(emoji,name) {
+  if (selectedChars.length >= selectedCount) { alert('已为所有玩家选择了角色！'); return; }
+  const card = document.querySelector(`[data-char="${emoji}"]`);
+  if (card.classList.contains('assigned')) return;
+  selectedChars.push(emoji); charNames[selectedChars.length-1] = name;
+  card.classList.add('assigned');
+  document.getElementById('selectedChars').textContent = '已选择: ' + selectedChars.map((c,i) => `玩家${i+1}=${c}${charNames[i]}`).join(', ');
+}
+
+function startGame() {
+  if (selectedChars.length < selectedCount) {
+    const allChars = ['🧑‍🚀','👩‍🎨','👨‍🔬','🕵️','🧙','🦸','🧛','🤖'];
+    const names = ['宇航员','艺术家','科学家','探险家','魔法师','超级英雄','吸血鬼','机器人'];
+    for (let i = selectedChars.length; i < selectedCount; i++) {
+      for (let j = 0; j < allChars.length; j++) {
+        if (!selectedChars.includes(allChars[j])) { selectedChars.push(allChars[j]); charNames[i] = names[j]; break; }
+      }
+    }
+  }
+  initGame();
+  document.getElementById('startScreen').classList.add('hidden');
+  const gs = document.getElementById('gameScreen');
+  gs.classList.remove('hidden');
+  setTimeout(() => gs.style.opacity = '1', 50);
+  document.body.classList.toggle('theme-china', selectedMap === 'china');
+}
+
+function initGame() {
+  const mapData = selectedMap === 'world' ? WORLD_MAP : CHINA_MAP;
+  gameState = { mapType: selectedMap, players: [], currentPlayer: 0, board: JSON.parse(JSON.stringify(mapData)), gameOver: false, winner: null, usedQuestions: new Set() };
+  const colors = ['#ff4757','#2ed573','#1e90ff','#ffa502'];
+  const colorNames = ['p1','p2','p3','p4'];
+  for (let i = 0; i < selectedCount; i++) {
+    gameState.players.push({ id:i, name:`玩家 ${i+1}`, char:selectedChars[i]||['🧑‍🚀','👩‍🎨','👨‍🔬','🕵️'][i], charName:charNames[i]||['宇航员','艺术家','科学家','探险家'][i], position:0, correct:0, wrong:0, skipTurns:0, color:colors[i], colorClass:colorNames[i] });
+  }
+  renderBoard(); renderPlayers(); updateUI(); addLog('🎮 游戏开始！' + (selectedMap==='world'?'世界之旅':'中华之旅'));
+}
+
+// ==================== BOARD RENDERING - FIXED LAYOUT ====================
+function renderBoard() {
+  const ring = document.getElementById('boardRing');
+  ring.innerHTML = '';
+  const cells = gameState.board;
+
+  if (selectedMap === 'world') {
+    // World map: circular ring layout (rotated 180°)
+    const count = cells.length;
+    const radius = 350;
+    const centerX = 400;
+    const centerY = 400;
+
+    cells.forEach((cell, i) => {
+      // 180° rotated: + Math.PI / 2 instead of - Math.PI / 2
+      const angle = (i / count) * Math.PI * 2 + Math.PI / 2;
+      const x = centerX + radius * Math.cos(angle) - 42.5;
+      const y = centerY + radius * Math.sin(angle) - 42.5;
+
+      const cellEl = document.createElement('div');
+      cellEl.className = `cell ${cell.type}`;
+      cellEl.id = `cell-${i}`;
+      cellEl.style.left = `${x}px`;
+      cellEl.style.top = `${y}px`;
+
+      cellEl.innerHTML = `
+        <div class="cell-face cell-front">
+          <div class="cell-icon">${cell.icon}</div>
+          <div class="cell-name">${cell.name}</div>
+        </div>
+        <div class="cell-face cell-back"></div>
+        <div class="cell-face cell-top"></div>
+        <div class="cell-face cell-right"></div>
+        <div class="cell-face cell-left"></div>
+        <div class="cell-face cell-bottom"></div>
+      `;
+
+      ring.appendChild(cellEl);
+    });
+  } else {
+    // China map: geographic position layout (rotated 180° via center symmetry)
+    const mapW = 800, mapH = 800;
+    const padding = 60;
+    const availW = mapW - padding * 2;
+    const availH = mapH - padding * 2;
+
+    // China outline shape (simplified rooster shape as SVG background) - rotated 180°
+    const chinaOutline = document.createElement('div');
+    chinaOutline.style.cssText = `position:absolute;left:${padding}px;top:${padding}px;width:${availW}px;height:${availH}px;opacity:0.15;pointer-events:none;z-index:1;`;
+    chinaOutline.innerHTML = `<svg viewBox="0 0 100 100" width="100%" height="100%"><path d="M75,8 L82,5 L88,8 L92,15 L90,22 L85,28 L88,35 L85,42 L80,45 L82,52 L78,58 L72,55 L68,60 L65,68 L60,72 L55,78 L50,82 L45,85 L40,88 L35,85 L30,80 L25,75 L20,70 L18,62 L15,55 L12,48 L10,40 L8,32 L10,25 L15,20 L20,18 L25,15 L30,12 L35,10 L40,8 L45,6 L50,5 L55,6 L60,5 L65,6 L70,7 Z" fill="rgba(255,215,0,.3)" stroke="rgba(255,215,0,.5)" stroke-width="0.5"/></svg>`;
+    ring.appendChild(chinaOutline);
+
+    cells.forEach((cell, i) => {
+      // 使用原始地理坐标，正向显示
+      const x = padding + cell.x * availW - 42.5;
+      const y = padding + cell.y * availH - 42.5;
+
+      const cellEl = document.createElement('div');
+      cellEl.className = `cell ${cell.type}`;
+      cellEl.id = `cell-${i}`;
+      cellEl.style.left = `${x}px`;
+      cellEl.style.top = `${y}px`;
+      cellEl.style.zIndex = '10';
+
+      cellEl.innerHTML = `
+        <div class="cell-face cell-front">
+          <div class="cell-icon">${cell.icon}</div>
+          <div class="cell-name">${cell.name}</div>
+        </div>
+        <div class="cell-face cell-back"></div>
+        <div class="cell-face cell-top"></div>
+        <div class="cell-face cell-right"></div>
+        <div class="cell-face cell-left"></div>
+        <div class="cell-face cell-bottom"></div>
+      `;
+
+      ring.appendChild(cellEl);
+    });
+
+    // Draw connection lines between adjacent cells in path order (rotated 180°)
+    const svgLines = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgLines.style.cssText = `position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:5;`;
+    let pathD = '';
+    cells.forEach((cell, i) => {
+      const next = cells[(i + 1) % cells.length];
+      // 使用原始地理坐标绘制连线
+      const x1 = padding + cell.x * availW;
+      const y1 = padding + cell.y * availH;
+      const x2 = padding + next.x * availW;
+      const y2 = padding + next.y * availH;
+      if (i === 0) pathD += `M${x1},${y1}`;
+      pathD += ` L${x2},${y2}`;
+    });
+    svgLines.innerHTML = `<path d="${pathD}" fill="none" stroke="rgba(255,215,0,.25)" stroke-width="3" stroke-dasharray="8,4"/>`;
+    ring.appendChild(svgLines);
+  }
+
+  document.getElementById('centerTitle').textContent = selectedMap === 'world' ? '🌍' : '🏯';
+}
+
+function renderPlayers() {
+  document.querySelectorAll('.player-token').forEach(t => t.remove());
+  gameState.players.forEach((player, i) => {
+    const token = document.createElement('div');
+    token.className = `player-token ${player.colorClass}`;
+    token.id = `player-${i}`;
+    token.textContent = player.char;
+    token.style.borderColor = '#fff';
+    document.getElementById('boardRing').appendChild(token);
+    updatePlayerPosition(i);
+  });
+}
+
+function updatePlayerPosition(playerIndex) {
+  const player = gameState.players[playerIndex];
+  const cells = gameState.board;
+  const cell = cells[player.position];
+
+  let x, y;
+
+  if (selectedMap === 'world') {
+    const count = cells.length;
+    const radius = 350;
+    const centerX = 400;
+    const centerY = 400;
+    // 180° rotated: + Math.PI / 2 instead of - Math.PI / 2
+    const angle = (player.position / count) * Math.PI * 2 + Math.PI / 2;
+
+    const sameCell = gameState.players.filter((p, idx) => idx !== playerIndex && p.position === player.position);
+    let offsetX = 0, offsetY = 0;
+    if (sameCell.length > 0) {
+      const idx = sameCell.length;
+      offsetX = (idx % 2 === 0 ? 18 : -18) * (Math.floor(idx / 2) + 1);
+      offsetY = (idx % 2 === 0 ? -18 : 18) * (Math.floor(idx / 2) + 1);
+    }
+
+    x = centerX + radius * Math.cos(angle) - 22 + offsetX;
+    y = centerY + radius * Math.sin(angle) - 22 + offsetY;
+  } else {
+    // China map: use geographic x,y rotated 180°
+    const mapW = 800, mapH = 800;
+    const padding = 60;
+    const availW = mapW - padding * 2;
+    const availH = mapH - padding * 2;
+
+    const sameCell = gameState.players.filter((p, idx) => idx !== playerIndex && p.position === player.position);
+    let offsetX = 0, offsetY = 0;
+    if (sameCell.length > 0) {
+      const idx = sameCell.length;
+      offsetX = (idx % 2 === 0 ? 20 : -20) * (Math.floor(idx / 2) + 1);
+      offsetY = (idx % 2 === 0 ? -20 : 20) * (Math.floor(idx / 2) + 1);
+    }
+
+    // 使用原始地理坐标，正向显示
+    x = padding + cell.x * availW - 22 + offsetX;
+    y = padding + cell.y * availH - 22 + offsetY;
+  }
+
+  const token = document.getElementById(`player-${playerIndex}`);
+  if (token) {
+    token.style.left = `${x}px`;
+    token.style.top = `${y}px`;
+  }
+}
+
+function updateUI() {
+  const panel = document.getElementById('playerPanel');
+  panel.innerHTML = '';
+  gameState.players.forEach((player, i) => {
+    const card = document.createElement('div');
+    card.className = `player-card ${i===gameState.currentPlayer?'active':''} ${player.skipTurns>0?'skip-turn':''}`;
+    const progress = Math.min((player.correct / WIN_SCORE) * 100, 100);
+    card.innerHTML = `
+      <div class="player-header">
+        <div class="player-avatar" style="background:${player.color}">${player.char}</div>
+        <div class="player-info">
+          <h4>${player.name} (${player.charName})</h4>
+          <div class="player-stats">
+            <span class="stat-correct">✓ ${player.correct}</span>
+            <span class="stat-wrong">✗ ${player.wrong}</span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;opacity:.7;">目标: ${WIN_SCORE}题</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
+      ${player.skipTurns>0?`<div style="font-size:10px;color:#ff4757;margin-top:4px;">⏸️ 暂停 ${player.skipTurns} 回合</div>`:''}
+    `;
+    panel.appendChild(card);
+  });
+
+  const current = gameState.players[gameState.currentPlayer];
+  document.getElementById('turnText').textContent = `${current.name} (${current.charName}) 的回合`;
+  document.getElementById('turnDot').style.background = current.color;
+  document.querySelectorAll('.player-token').forEach((t, i) => t.classList.toggle('active', i === gameState.currentPlayer));
+
+  const rollBtn = document.getElementById('rollBtn');
+  const canRoll = !isRolling && !waitingForQuizClose && current.skipTurns === 0 && !gameState.gameOver;
+  rollBtn.disabled = !canRoll;
+  rollBtn.textContent = current.skipTurns > 0 ? '⏸️ 暂停中' : '🎲 投掷骰子';
+
+  // Highlight current cell
+  document.querySelectorAll('.cell').forEach((c, i) => c.classList.toggle('current-cell', i === current.position));
+}
+
+// ==================== DICE & MOVEMENT ====================
+function rollDice() {
+  if (isRolling || waitingForQuizClose) return;
+  const current = gameState.players[gameState.currentPlayer];
+  if (current.skipTurns > 0 || gameState.gameOver) return;
+
+  isRolling = true; updateUI();
+  const dice = document.getElementById('dice3d');
+  dice.classList.add('rolling');
+  const result = Math.floor(Math.random() * 6) + 1;
+
+  setTimeout(() => {
+    dice.classList.remove('rolling');
+    setDiceRotation(result);
+    setTimeout(() => { movePlayer(gameState.currentPlayer, result); isRolling = false; }, 400);
+  }, 1100);
+}
+
+function setDiceRotation(value) {
+  const dice = document.getElementById('dice3d');
+  const r = { 1:'rotateX(0)rotateY(0)', 2:'rotateX(180deg)rotateY(0)', 3:'rotateX(0)rotateY(-90deg)', 4:'rotateX(0)rotateY(90deg)', 5:'rotateX(-90deg)rotateY(0)', 6:'rotateX(90deg)rotateY(0)' };
+  dice.style.transform = r[value];
+}
+
+function movePlayer(playerIndex, steps) {
+  const player = gameState.players[playerIndex];
+  const oldPos = player.position;
+  const boardLen = gameState.board.length;
+  let currentStep = 0;
+
+  const moveInterval = setInterval(() => {
+    if (currentStep >= steps) {
+      clearInterval(moveInterval);
+      onLand(playerIndex);
+      return;
+    }
+    player.position = (player.position + 1) % boardLen;
+    updatePlayerPosition(playerIndex);
+    currentStep++;
+    // Visual feedback on cell
+    const cell = document.getElementById(`cell-${player.position}`);
+    if (cell) {
+      cell.style.transform = 'translateZ(30px) scale(1.08)';
+      setTimeout(() => { cell.style.transform = ''; }, 200);
+    }
+  }, 280);
+
+  addLog(`${player.name} 掷出 ${steps} 点，从 ${gameState.board[oldPos].name} → ${gameState.board[(oldPos+steps)%boardLen].name}`);
+}
+
+function onLand(playerIndex) {
+  const player = gameState.players[playerIndex];
+  const cell = gameState.board[player.position];
+  if (cell.type === 'chance') { handleChance(playerIndex); }
+  else if (cell.type === 'start') { addLog(`${player.name} 经过起点，继续冒险！`); nextTurn(); }
+  else { showQuiz(playerIndex, cell.name); }
+}
+
+// ==================== CHANCE ====================
+function handleChance(playerIndex) {
+  const event = CHANCE_EVENTS[Math.floor(Math.random() * CHANCE_EVENTS.length)];
+  const player = gameState.players[playerIndex];
+  addLog(`🎲 ${player.name} 触发机会：${event.text}`);
+
+  switch(event.effect) {
+    case 'free_correct':
+      player.correct = Math.min(player.correct + 1, WIN_SCORE);
+      addLog(`${player.name} 直接获得1分！(${player.correct}/${WIN_SCORE})`);
+      checkWin(); if (!gameState.gameOver) nextTurn();
+      break;
+    case 'back':
+      player.position = (player.position - event.steps + gameState.board.length) % gameState.board.length;
+      updatePlayerPosition(playerIndex); addLog(`${player.name} 后退 ${event.steps} 格！`); nextTurn();
+      break;
+    case 'forward':
+      player.position = (player.position + event.steps) % gameState.board.length;
+      updatePlayerPosition(playerIndex); addLog(`${player.name} 前进 ${event.steps} 格！`); onLand(playerIndex);
+      return;
+    case 'bonus': showQuiz(playerIndex, gameState.board[player.position].name, true); return;
+    case 'skip_turn': player.skipTurns = 1; addLog(`${player.name} 暂停一回合！`); nextTurn(); break;
+    case 'easy': addLog(`${player.name} 获得简单模式（效果已记录）`); nextTurn(); break;
+    case 'roll_again': addLog(`${player.name} 可以再掷一次！`); isRolling = false; updateUI(); return;
+  }
+}
+
+// ==================== QUIZ - FIXED Z-INDEX & CLICK ====================
+function showQuiz(playerIndex, location, isBonus = false) {
+  const questions = gameState.mapType === 'world' ? WORLD_QUESTIONS : CHINA_QUESTIONS;
+  const locQuestions = questions[location];
+  if (!locQuestions || locQuestions.length === 0) { addLog(`⚠️ ${location} 题库为空`); nextTurn(); return; }
+
+  let available = locQuestions.map((q, i) => i).filter(i => !gameState.usedQuestions.has(`${location}-${i}`));
+  if (available.length === 0) { gameState.usedQuestions.clear(); available = locQuestions.map((q, i) => i); }
+
+  const qIndex = available[Math.floor(Math.random() * available.length)];
+  gameState.usedQuestions.add(`${location}-${qIndex}`);
+  const question = locQuestions[qIndex];
+  currentQuiz = { playerIndex, question, location, isBonus, answered: false };
+
+  waitingForQuizClose = true; updateUI();
+
+  document.getElementById('quizIcon').textContent = gameState.board[gameState.players[playerIndex].position].icon;
+  document.getElementById('quizLocation').textContent = location;
+  document.getElementById('quizCategory').textContent = gameState.mapType === 'world' ? '🌍 世界知识问答' : '🏯 中华知识问答';
+  document.getElementById('quizQuestion').textContent = question.q;
+
+  const optionsContainer = document.getElementById('quizOptions');
+  optionsContainer.innerHTML = '';
+  question.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `<div class="option-label">${String.fromCharCode(65 + i)}</div><div style="flex:1">${opt}</div>`;
+    btn.onclick = function(e) { e.stopPropagation(); answerQuiz(i); };
+    optionsContainer.appendChild(btn);
+  });
+
+  document.getElementById('explanation').classList.remove('show');
+  document.getElementById('explanation').innerHTML = '';
+  const actionBtn = document.getElementById('quizActionBtn');
+  actionBtn.textContent = '请选择答案';
+  actionBtn.disabled = true;
+  actionBtn.onclick = function(e) { e.stopPropagation(); closeQuiz(); };
+
+  document.getElementById('quizModal').classList.add('show');
+}
+
+function answerQuiz(answerIndex) {
+  if (!currentQuiz || currentQuiz.answered) return;
+  currentQuiz.answered = true;
+  const { playerIndex, question } = currentQuiz;
+  const player = gameState.players[playerIndex];
+  const isCorrect = answerIndex === question.a;
+
+  document.querySelectorAll('.option-btn').forEach((btn, i) => {
+    btn.classList.add('disabled');
+    btn.onclick = null;
+    if (i === question.a) btn.classList.add('correct');
+    else if (i === answerIndex && !isCorrect) btn.classList.add('wrong');
+  });
+
+  const expDiv = document.getElementById('explanation');
+  expDiv.innerHTML = `<div style="font-weight:bold;margin-bottom:8px;color:${isCorrect?'#2ed573':'#ff4757'}">${isCorrect?'✅ 回答正确！':'❌ 回答错误！'}</div><div>${question.exp}</div>`;
+  expDiv.classList.add('show');
+
+  const actionBtn = document.getElementById('quizActionBtn');
+  actionBtn.textContent = '继续';
+  actionBtn.disabled = false;
+
+  if (isCorrect) {
+    player.correct++;
+    addLog(`✅ ${player.name} 在 ${currentQuiz.location} 答对！(${player.correct}/${WIN_SCORE})`);
+  } else {
+    player.wrong++;
+    addLog(`❌ ${player.name} 在 ${currentQuiz.location} 答错`);
+    if (player.wrong % SKIP_THRESHOLD === 0 && player.wrong > 0) {
+      player.skipTurns = 1;
+      addLog(`⚠️ ${player.name} 累计答错 ${player.wrong} 题，暂停一回合！`);
+    }
+  }
+  updateUI(); checkWin();
+}
+
+function closeQuiz() {
+  if (!currentQuiz) return;
+  document.getElementById('quizModal').classList.remove('show');
+  waitingForQuizClose = false; currentQuiz = null;
+  if (!gameState.gameOver) nextTurn();
+}
+
+// ==================== TURN & WIN ====================
+function nextTurn() {
+  if (gameState.gameOver) return;
+  const current = gameState.players[gameState.currentPlayer];
+  if (current.skipTurns > 0) { current.skipTurns--; addLog(`${current.name} 暂停结束`); }
+  do { gameState.currentPlayer = (gameState.currentPlayer + 1) % gameState.players.length; }
+  while (gameState.players[gameState.currentPlayer].skipTurns > 0 && !gameState.gameOver);
+  updateUI();
+}
+
+function checkWin() {
+  const winner = gameState.players.find(p => p.correct >= WIN_SCORE);
+  if (winner && !gameState.gameOver) {
+    gameState.gameOver = true; gameState.winner = winner;
+    setTimeout(() => showGameOver(), 600);
+  }
+}
+
+function showGameOver() {
+  const winner = gameState.winner;
+  document.getElementById('winnerName').textContent = `${winner.name} (${winner.charName})`;
+  const statsDiv = document.getElementById('finalStats');
+  statsDiv.innerHTML = '';
+  gameState.players.forEach(p => {
+    const stat = document.createElement('div');
+    stat.className = 'final-stat';
+    stat.innerHTML = `<div style="font-size:28px;margin-bottom:5px;">${p.char}</div><div class="final-stat-value">${p.correct}</div><div class="final-stat-label">${p.name}<br>✓${p.correct} ✗${p.wrong}</div>`;
+    statsDiv.appendChild(stat);
+  });
+  document.getElementById('gameScreen').style.opacity = '0';
+  setTimeout(() => {
+    document.getElementById('gameScreen').classList.add('hidden');
+    document.getElementById('gameOverScreen').classList.remove('hidden');
+  }, 500);
+  createConfetti();
+  addLog(`🏆 游戏结束！${winner.name} 获胜！`);
+}
+
+function createConfetti() {
+  const colors = ['#ff4757','#2ed573','#1e90ff','#ffa502','#ffd700','#ff6b6b'];
+  for (let i = 0; i < 80; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.cssText = `left:${Math.random()*100}vw;background:${colors[Math.floor(Math.random()*colors.length)]};animation-duration:${Math.random()*3+2}s;border-radius:${Math.random()>.5?'50%':'0'};`;
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 5000);
+  }
+}
+
+// ==================== SAVE / LOAD ====================
+function saveGame() {
+  const saveData = { gameState: {...gameState, usedQuestions: Array.from(gameState.usedQuestions)}, selectedMap, selectedCount, selectedChars, charNames, timestamp: new Date().toLocaleString('zh-CN') };
+  localStorage.setItem('monopolyQuizSave_v2', JSON.stringify(saveData));
+  addLog('💾 游戏已保存！'); alert('游戏已保存到本地存档！');
+}
+function loadGame() {
+  const saveData = localStorage.getItem('monopolyQuizSave_v2');
+  if (!saveData) { alert('没有找到存档！'); return; }
+  try {
+    const data = JSON.parse(saveData);
+    selectedMap = data.selectedMap; selectedCount = data.selectedCount;
+    selectedChars = data.selectedChars; charNames = data.charNames;
+    gameState = {...data.gameState, usedQuestions: new Set(data.gameState.usedQuestions)};
+    document.getElementById('startScreen').classList.add('hidden');
+    const gs = document.getElementById('gameScreen');
+    gs.classList.remove('hidden'); gs.style.opacity = '1';
+    document.getElementById('gameOverScreen').classList.add('hidden');
+    document.body.classList.toggle('theme-china', selectedMap === 'china');
+    renderBoard(); renderPlayers(); updateUI(); addLog('📂 存档已读取！');
+    if (gameState.gameOver) showGameOver();
+  } catch(e) { alert('存档读取失败！'); console.error(e); }
+}
+function returnToMenu() {
+  document.getElementById('gameScreen').classList.add('hidden');
+  document.getElementById('gameScreen').style.opacity = '0';
+  document.getElementById('gameOverScreen').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+  document.body.classList.remove('theme-china');
+  selectedChars = []; charNames = {};
+  document.getElementById('selectedChars').textContent = '';
+  document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected','assigned'));
+}
+
+// ==================== LOG ====================
+function addLog(message) {
+  const log = document.getElementById('gameLog');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.textContent = `[${new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}] ${message}`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ==================== KEYBOARD ====================
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && !waitingForQuizClose && !document.getElementById('gameScreen').classList.contains('hidden')) {
+    e.preventDefault(); rollDice();
+  }
+  if (e.code === 'Escape') {
+    if (document.getElementById('quizModal').classList.contains('show') && currentQuiz && currentQuiz.answered) {
+      closeQuiz();
+    }
+  }
+});
+
+// ==================== 3D ROTATION (SPHERICAL) ====================
+let isDragging = false;
+let startMouseX = 0, startMouseY = 0;
+let rotX = 18, rotY = 0; // 当前旋转角度（X: 俯仰, Y: 水平）
+let startRotX = 18, startRotY = 0;
+let isFixedAngle = false;
+let fixedAngleValue = 0;
+
+function applyWorldTransform() {
+  const world = document.getElementById('world3d');
+  if (!world) return;
+  const targetY = isFixedAngle ? fixedAngleValue : rotY;
+  const targetX = isFixedAngle ? 18 : rotX;
+  world.style.transform = `rotateX(${targetX}deg) rotateY(${targetY}deg) rotateZ(2deg)`;
+}
+
+function setTransition(enabled) {
+  const world = document.getElementById('world3d');
+  if (!world) return;
+  world.style.transition = enabled ? 'transform 1.2s ease' : 'none';
+}
+
+function isSceneTarget(e) {
+  return e.target.closest('.world-3d') || e.target.closest('.scene-3d') || e.target.closest('.cell') || e.target.closest('.board-ring') || e.target.closest('.center-hub') || e.target.closest('.player-token');
+}
+
+// Mouse drag
+document.addEventListener('mousedown', (e) => { 
+  if (e.target.closest('.angle-control') || e.target.closest('.modal-overlay') || e.target.closest('.quiz-modal') || e.target.closest('.dice-container') || e.target.closest('.player-panel') || e.target.closest('.turn-indicator') || e.target.closest('.game-log') || e.target.closest('.save-panel')) return;
+  if (isSceneTarget(e)) { 
+    isDragging = true; 
+    startMouseX = e.clientX;
+    startMouseY = e.clientY;
+    startRotX = rotX;
+    startRotY = rotY;
+    if (isFixedAngle) {
+      isFixedAngle = false;
+      updateAngleButtons();
+    }
+    setTransition(false);
+  } 
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const deltaX = e.clientX - startMouseX;
+  const deltaY = e.clientY - startMouseY;
+  rotY = startRotY + deltaX * 0.5;
+  rotX = startRotX - deltaY * 0.5;
+  // 限制X轴，避免完全翻转导致视角混乱
+  if (rotX > 85) rotX = 85;
+  if (rotX < -85) rotX = -85;
+  applyWorldTransform();
+});
+
+document.addEventListener('mouseup', () => { 
+  if (isDragging) {
+    isDragging = false; 
+    setTransition(true);
+  }
+});
+
+// Touch drag
+document.addEventListener('touchstart', (e) => { 
+  if (e.target.closest('.angle-control') || e.target.closest('.modal-overlay') || e.target.closest('.quiz-modal') || e.target.closest('.dice-container') || e.target.closest('.player-panel') || e.target.closest('.turn-indicator') || e.target.closest('.game-log') || e.target.closest('.save-panel')) return;
+  if (isSceneTarget(e)) { 
+    isDragging = true; 
+    startMouseX = e.touches[0].clientX;
+    startMouseY = e.touches[0].clientY;
+    startRotX = rotX;
+    startRotY = rotY;
+    if (isFixedAngle) {
+      isFixedAngle = false;
+      updateAngleButtons();
+    }
+    setTransition(false);
+  } 
+}, {passive: false});
+
+document.addEventListener('touchmove', (e) => {
+  if (!isDragging) return;
+  e.preventDefault();
+  const deltaX = e.touches[0].clientX - startMouseX;
+  const deltaY = e.touches[0].clientY - startMouseY;
+  rotY = startRotY + deltaX * 0.5;
+  rotX = startRotX - deltaY * 0.5;
+  if (rotX > 85) rotX = 85;
+  if (rotX < -85) rotX = -85;
+  applyWorldTransform();
+}, {passive: false});
+
+document.addEventListener('touchend', () => { 
+  if (isDragging) {
+    isDragging = false; 
+    setTransition(true);
+  }
+});
+
+// Auto gentle rotation (like a globe)
+setInterval(() => {
+  if (!isDragging && !isFixedAngle && !document.getElementById('gameScreen').classList.contains('hidden')) {
+    rotY = (rotY + 0.03) % 360;
+    applyWorldTransform();
+  }
+}, 50);
+
+function setFixedAngle(angle) {
+  const world = document.getElementById('world3d');
+  if (!world) return;
+  
+  if (angle === -1) {
+    isFixedAngle = false;
+    updateAngleButtons();
+  } else {
+    isFixedAngle = true;
+    fixedAngleValue = angle;
+    rotX = 18;
+    rotY = angle;
+    world.style.transition = 'transform 0.6s cubic-bezier(.34,1.56,.64,1)';
+    applyWorldTransform();
+    setTimeout(() => {
+      if (world) world.style.transition = 'transform 1.2s ease';
+    }, 600);
+  }
+  updateAngleButtons();
+}
+
+function updateAngleButtons() {
+  const angles = [0, 90, 180, 270, -1];
+  document.querySelectorAll('.angle-btn').forEach((btn, i) => {
+    const isActive = isFixedAngle ? fixedAngleValue === angles[i] : angles[i] === -1;
+    btn.classList.toggle('active', isActive);
+  });
+}
+
+// ==================== INIT ====================
+window.addEventListener('load', () => { selectMap('world'); selectCount(2); });
+
+</script>
+</body>
+</html>
